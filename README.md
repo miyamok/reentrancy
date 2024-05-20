@@ -94,7 +94,33 @@ The following diagram illustrates the scenario.
 
 ![reentrancy](imgs/reentrancy.png)
 
+## Demonstration
+
+
 # Secure programming to prevent reentrancy
 
+We discuss a couple of workarounds to prevent the above unfortunate story.
+
+## Lock
+
+A common solution is to use a lock object, which creates a critical region in the source code to prevent the unwelcomed execution through reentrancy.
+Typically a lock object is a state variable of integer or boolean type.  Using boolean, it becomes true before it enters a critical region and false after the region, and in case it is already true before the critical region, the execution cannot enter the region.  A use of interger allows more flexibility by specifying the maximal number more than one for reentrancy, rather than exactly one in case of boolean.
+In the <code>Jar</code> contract, the line of <code>msg.sender.call</code> should be a crucial part of the critical region.
+An easy way of implementing it is to use <code>ReentranceGuard</code> of openzeppelin (https://github.com/binodnp/openzeppelin-solidity/blob/master/docs/ReentrancyGuard.md).
+They provide a modifier <code>nonReentrant</code> which should be applied to a function.  In our example, the <code>withdraw</code> function is a right candidate to get this modifier, so that the whole content, surely including the above mentioned critical line, is under the control of the lock object.
+The attacker contract fails to steal money, because in the first reentrancy (i.e. the secondary call of <code>withdraw</code>), the reentrancy is detected and the whole transaction is reverted.
+
+## Update the critical value before transfer
+
+Another solution particularly applicable to our case is to set zero for <code>balance</code> immediately after checking the non-zero and before the transfer.
+By this improvement, the attacker fails because the balance of the attacker is already zero and reentrancy doesn't make the second transfer.
+
+## Use of underflow
+
+Although I this option is not a practically recommendable workaround, at least in my personal opinion, I would like to mention it because it explains the importance of recent change of the solidity language to cause revert in case of arithmetical failures such as underflow, and also how attackers attempt is foiled by a revert.
+
+Instead of putting zero for the balance, one can subtract the amount of transfer.  Then, in the reentrancy, it causes an arithmetical underflow error because the subtrantion makes the value of balance, that is of unsigned integer type, negative.  The attacker fails because the latest solidity reverts in case of underflow; the whole transaction is reverted.
+
+This is a working solution, but the previous options look much better becuase they show a clear intention of preventing the reentrancy.  On the other hand, this explains that a revert is an effective mechanism of secure programming.
 
 # Formal verification
