@@ -92,7 +92,7 @@ The definition of <code>IJar</code> stands for the interface to <code>Jar</code>
 
 The following diagram illustrates the scenario.
 
-![reentrancy](https://github.com/miyamok/reentrancy/assets/58558301/30b364fb-612b-4a9e-aeb1-bdc484f2db43)
+![reentrancy](imgs/reentrancy.png)
 
 # Secure programming to prevent reentrancy
 
