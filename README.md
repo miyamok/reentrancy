@@ -11,7 +11,7 @@ The full source codes for this project is published on github.
 # Reentrancy
 
 The reentrancy is a cause of security problem which leads to a massive finnancial loss.
-As the name suggests, this is due to reentrance of the execution into a function.  Let's take a look at a running example of a vulnerable solidity code.
+As the name suggests, it exploits a function whose execution leads to another execution of itself.  Let's take a look at a running example of a vulnerable solidity code.
 
 ## Vulnerable smart contract: Coin jar
 
@@ -46,7 +46,7 @@ This smart contract has a security problem due to the use of the <code>call</cod
 
 We are going to see that we can create a malicious contract which can steal money from the Jar contract by repeatedly calling the <code>withdraw</code> function of the Jar contract; that is why this vulnerability is called reentrancy.
 
-# Attacking a vulnerable contract
+## Attacking a vulnerable contract
 The following smart contract is a successful attacker.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
