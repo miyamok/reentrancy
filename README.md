@@ -94,4 +94,3 @@ The definition of <code>IJar</code> stands for the interface to <code>Jar</code>
 
 
 # Formal verification
-
