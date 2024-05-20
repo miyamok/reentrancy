@@ -90,6 +90,10 @@ contract Attacker {
 ```
 The definition of <code>IJar</code> stands for the interface to <code>Jar</code>.  This <code>Attacker</code> contract should be deployed with an argument the address of the target contract.  By <code>deposit</code>, this attacker contract makes a deposit in the target <code>Jar</code> contract.  Assuming we have made 1 ether of deposit, the <code>attack</code> funtion starts the main business of this attacker contract.  It calls <code>withdraw</code> function of the <code>Jar</code>, then the <code>Jar</code> contract sends 1 ether, the exact deposit amount, to the <code>Attacker</code> contract by means of the <code>call</code> function.  This <code>call</code> function invokes the <code>receive</code> function of the attacker contract, which again withdraw money from the <code>Jar</code> contract as long as the <code>Jar</code> contract owns at least 1 ether.  Reentering the <code>withdraw</code> function of the <code>Jar</code> contract, the balance of the attacker is still 1 ether, and hence it sends 1 ether to the attacker.  This process goes on until the asset of <code>Jar</code> subseeds 1 ether, namely, <code>Jar</code> loses nearly all its asset.
 
+The following diagram illustrates the scenario.
+
+![reentrancy](https://github.com/miyamok/reentrancy/assets/58558301/30b364fb-612b-4a9e-aeb1-bdc484f2db43)
+
 # Secure programming to prevent reentrancy
 
 
