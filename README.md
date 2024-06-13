@@ -141,6 +141,8 @@ We practice formal verification by means of SMT solver concerning this security 
 - Solidity code of the vulnerable smart contract ([Jar.sol](Solidity/Jar.sol))
 - Solidity code of the attacker smart contract ([Attacker.sol](Solidity/Attacker.sol))
 - SMTLIB2 model of the vulnerable smart contract and the security property ([jar.smt](smt/jar.smt))
+- Solidity code of the secure smart contract ([Jar_locked.sol](Solidity/Jar_locked.sol))
+- SMTLIB2 model of the secure smart contract and the security property ([jar_locked.smt](smt/jar_locked.smt))
 
 ### Example of reentrancy attack
 
@@ -213,8 +215,7 @@ When the <code>Attacker</code> contract receives money, its <code>receive()</cod
 As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the jar contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim goes less than 1 ETH.
 
 ### Problem analysis
-
-Jar sends money to an arbitrary address, that means, anybody who makes a deposit.  Here, there is a possibility of its sending money to an unknown smart contract rather than an EOA (externally owned account).  The prerequisite for successful withdrawal is that the balance <code>balance[msg.sender]</code> is positive.  As the balance is not changed before the actual money transfer, the prerequisite is samely satisfied in case of a reentrancy, hence it repeatedly sends money.  After the attacker stops the process, the the whole transaction will successfully be over without causing a revert; it just assigns <code>0</code> to <code>balance[msg.sender]</code> after all transfers were done.
+An arbitrary address can make a deposit, calling to <code>Jar.deposit()</code> with sending money to deposit.  As <code>Jar</code> pays back money exactly to the depositor, there is a possibility of its sending money back to a smart contract rather than an EOA (externally owned account).  The prerequisite for a successful withdrawal is that the balance <code>balance[msg.sender]</code> is positive.  In the function <code>withdraw()</code>, the balance is set to be 0 after the actual money transfer, the prerequisite is samely satisfied in case of a reentrancy, hence it repeatedly sends money.  After the attacker stops the process, the the whole transaction will successfully be over without causing a revert; it just assigns <code>0</code> to <code>balance[msg.sender]</code> after all transfers were done.
 
 Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
 
