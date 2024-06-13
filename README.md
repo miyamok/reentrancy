@@ -1,10 +1,10 @@
 # Demonstrating the reentrancy vulnerability of smart contracts
 
 The objective of this project is two folds.
-The one is to demonstrate the reentrancy vulnerability of smart contract, and the second is to systematically detect a potential vulnerability of a solidity code through formal verification.
+The one is to demonstrate the reentrancy vulnerability of smart contracts, and the second is to systematically detect a potential vulnerability of a solidity code through formal verification.
 The solidity compiler solc has already equipped rich formal verification features due to model checkers and SMT solvers, but in order to carry out it for the reentrancy issue, a programmer has to be aware of such potential problems and explicitly put assertions in a source code, that surely requires skills for secure programming.  For this project, we don't suppose that programmers have such skills, and I am going to offer a prototypical solution for them, so that they get a warning of a presence of potential reentrancy vulnerability in their code wihtout any prerequisite secure programming knowdledge.
 
-The rest of this document is organized as follows.  We first review what the reentrancy problem is.  Then secondly, we are going to see a running example of a vulnerable contract and an attacker contract.  Thirdly, we see a couple of security tips to prevent the problem, and forthly, we apply formal verification to find that our contract is indeed vulnerable, where we also go through a minimal background of formal verification.
+The rest of this document is organized as follows.  We first review what the reentrancy problem is.  There, we are going to see a running example of a vulnerable contract and an attacker contract, and a couple of security tips to prevent the problem.  Then we apply a formal verification technique due to an SMT solver Z3 to find that our contract is indeed vulnerable and also that a secure programming workaround manages the security vulnerability.  We also go through a minimal background of formal verification.
 
 The full source codes for this project is published on github.
 
@@ -100,11 +100,11 @@ We demonstrate the reentrancy in an actual blockchain.
 The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia testnet.
 
 
-# Secure programming to prevent reentrancy
+## Secure programming to prevent reentrancy
 
 We discuss a couple of workarounds to prevent the above unfortunate story.
 
-## Lock
+### Lock
 
 A common solution is to use a lock object, which creates a critical region in the source code to prevent the unwelcomed execution through reentrancy.
 Typically a lock object is a state variable of integer or boolean type.  Using boolean, it becomes true before it enters a critical region and false after the region, and in case it is already true before the critical region, the execution cannot enter the region.  A use of interger allows more flexibility by specifying the maximal number more than one for reentrancy, rather than exactly one in case of boolean.
@@ -113,12 +113,12 @@ An easy way of implementing it is to use <code>ReentranceGuard</code> of openzep
 They provide a modifier <code>nonReentrant</code> which should be applied to a function.  In our example, the <code>withdraw</code> function is a right candidate to get this modifier, so that the whole content, surely including the above mentioned critical line, is under the control of the lock object.
 The attacker contract fails to steal money, because in the first reentrancy (i.e. the secondary call of <code>withdraw</code>), the reentrancy is detected and the whole transaction is reverted.
 
-## Updating the critical value before transfer
+### Updating the critical value before transfer
 
 Another solution particularly applicable to our case is to set zero for <code>balance</code> immediately after checking the non-zero and before the transfer.
 By this improvement, the attacker fails because the balance of the attacker is already zero and reentrancy doesn't make the second transfer.
 
-## Underflow
+### Underflow
 
 Although I this option is not a practically recommendable workaround, at least in my personal opinion, I would like to mention it because it explains the importance of recent change of the solidity language to cause revert in case of arithmetical failures such as underflow, and also how attackers attempt is foiled by a revert.
 
@@ -128,19 +128,18 @@ This is a working solution, but the previous options look much better becuase th
 
 # Formal verification
 
-As a case study, we apply formal verification in order to detect the reentrancy vulnerability of the jar contract.  We manually formalized a model of the jar contract, and use it to find a possible reentrancy which causes a change of persistent data, such as state variables of the contract and asset balances.  The safety property to check is that there is no reentrancy which causes multiple changes of asset balance, and we get a counter example for it, namely, an evidence showing a violation of the safety property.
+As a case study, we apply formal verification in order to detect the reentrancy vulnerability of the jar contract.  We manually formalized a model of the jar contract, and use it to find a possible reentrancy which causes a change of persistent data, such as state variables of the contract and asset balances.  The safety property to check is that the change of asset balance is deterministic.  In case there is a non-determinism, we get an evidence showing a violation of the safety property.
 
-The solc compiler has rich features of formal verifications due to model checking and SMT solvers.   in order to make use of these solc features, a programmer is required to put assertions properly, and that means one should know about security.
-Our case study of formal verification indeed works to the above shown vulnerable smart contract without any modification of the solidity code, namely, a programmer is not required to know about security.
-A drawback in comparison to existing solc formal verification is that our method issues probably too many warnings, those are a kind of false positives.
-It is not possible to automatically determine what kind of reentrancy should be accepted and what should not be, so we would like to leave this problem for future work.  Currently the logical model of our smart contract for formal verification is manually implemented.  The automatic model construction, that solc does for (almost) arbitrary solidity code, is missing in our side, and left for future work, too.
+The solc compiler has rich features of formal verifications due to model checking as well as SMT solving.   In order to make use of these solc features for detecting a reentrancy vulnerability, a programmer is required to put assertions properly, and that means one should know about security.
+Our case study of formal verification indeed works to the above shown vulnerable smart contract without any modification of the solidity code, namely, a programmer is required neither to know about security nor to put additional assertions for reentrancy analysis.
 
+<!-- A current drawback in comparison to existing solc formal verification is that our method may issue too many warnings, those are a kind of false positives.  It is not possible to automatically determine what kind of reentrancy should be accepted and what should not be, so we would like to leave this problem for future work.  Currently the logical model of our smart contract for formal verification is manually implemented.  The automatic model construction, that solc does for (almost) arbitrary solidity code, is missing in our side, and left for future work, too. -->
 ## Reentrancy analysis
 
-The vulnerability due to reentrancy is a major security problem of smart contract.
 We practice formal verification by means of SMT solver concerning this security problem.
 
-- Solidity code of the vulnerable smart contract and the attacker ([reentrancy.sol](sample-solidity/reentrancy.sol))
+- Solidity code of the vulnerable smart contract ([Jar.sol](Solidity/Jar.sol))
+- Solidity code of the attacker smart contract ([Attacker.sol](Solidity/Attacker.sol))
 - SMTLIB2 model of the vulnerable smart contract and the security property ([jar.smt](smt/jar.smt))
 
 ### Example of reentrancy attack
