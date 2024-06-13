@@ -582,3 +582,12 @@ TODO: automatically generate a model and a security property for a given source 
 - https://www.alchemy.com/overviews/reentrancy-attack-solidity
 - https://hackernoon.com/hack-solidity-reentrancy-attack
 
+### References
+
+<a id="1">[1]</a>
+Leonardo Alt, Martin Blicha, Antti E. J. Hyvärinen, Natasha Sharygina:
+SolCMC: Solidity Compiler's Model Checker. CAV (1) 2022: 325-338
+
+<a id="2">[2]</a>
+Matteo Marescotti, Rodrigo Otoni, Leonardo Alt, Patrick Eugster, Antti E. J. Hyvärinen, Natasha Sharygina:
+Accurate Smart Contract Verification Through Direct Modelling. ISoLA (3) 2020: 178-194
