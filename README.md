@@ -41,9 +41,15 @@ contract Jar {
     }
 }
 ```
-It has two external functions, <code>deposit</code> and <code>withdraw</code>, which are respectively to deposit crypto currency into this jar contract and to withdraw one's deposit.  The state variable <code>balance</code> records which contract address has how much deposit, and it is increased as a deposit is made via the <code>deposit</code> function.  The function <code>withdraw</code> is used to withdraw all the asset which one has deposited so far.  It first checks that the balance is non-zero, sends the deposit to the original asset owner (i.e. <code>msg.sender</code>), and then in case of the transfer is successful the balance is reset to zero.  In case the balance is zero or the transfer has failed, the transaction is reverted.
+It has two external functions, <code>deposit</code> and <code>withdraw</code>, which are respectively to deposit crypto currency into this jar contract and to withdraw one's deposit.  The state variable <code>balance</code> records which contract address has how much deposit, and it is increased as a deposit is made via the <code>deposit</code> function.  The function <code>withdraw</code> is used to withdraw all the asset which one has deposited so far.  It first checks that the balance is non-zero, then sends the deposit to <code>msg.sender</code>, the depositor.  If the transfer is successful the balance is reset to zero.  If the balance is zero or the transfer has failed, the transaction is reverted.
 
-This smart contract has a security problem due to the use of the <code>call</code> function.  Although the call message is the null string (i.e. <code>""</code>), this invokes a payable function in case <code>msg.sender</code> is a smart contract, and the content of the payable function is in general unknown and hence arbitrary.
+This smart contract has a security problem due to the use of the <code>call</code> function.  The <code>call</code> function is to call a function of a smart contract, optionally sending native cryptocurrency.  It is commonly used to simply send native cryptocurrency, typically in the following syntax,
+```
+addr.call{ value: amount }("")
+```
+where <code>addr</code> is the distination address, <code>amount</code> is the amount to send in unsigned integer, and the nullstring (i.e. <code>""</code>) is to designate that it specifies no particular function of <code>addr</code> to call.  In order to make a particular function call, a call message in the abi format should be given instead of the nullstring (cf. https://solidity-by-example.org/call/).
+
+There is a problem if <code>msg.sender</code> is a smart contract.  Even if the call message is the null string, this invokes a payable function of the smart contract <code>msg.sender</code>.  The content of the payable function is in general unknown and hence we have to assume an arbitrary code is executed.
 
 We are going to see that we can create a malicious contract which can steal money from the Jar contract by repeatedly calling the <code>withdraw</code> function of the Jar contract.
 
@@ -89,38 +95,33 @@ contract Attacker {
     }
 }
 ```
-The definition of <code>IJar</code> stands for the interface to <code>Jar</code>.  This <code>Attacker</code> contract should be deployed with an argument the address of the target contract.  By <code>deposit</code>, this attacker contract makes a deposit in the target <code>Jar</code> contract.  Assuming we have made 1 ether of deposit, the <code>attack</code> funtion starts the main business of this attacker contract.  It calls <code>withdraw</code> function of the <code>Jar</code>, then the <code>Jar</code> contract sends 1 ether, the exact deposit amount, to the <code>Attacker</code> contract by means of the <code>call</code> function.  This <code>call</code> function invokes the <code>receive</code> function of the attacker contract, which again withdraw money from the <code>Jar</code> contract as long as the <code>Jar</code> contract owns at least 1 ether.  Reentering the <code>withdraw</code> function of the <code>Jar</code> contract, the balance of the attacker is still 1 ether, and hence it sends 1 ether to the attacker.  This process goes on until the asset of <code>Jar</code> subseeds 1 ether, namely, <code>Jar</code> loses nearly all its asset.
+<code>IJar</code> is the interface to use <code>Jar</code>.  The constructor is payable and has one argument for the address; the target Jar contract should be provided at the time of deployment.  <code>deposit</code> is the function for the <code>Attacker</code> contract to make a 1 ether deposit into the Jar contract.  <code>attack</code> is the function to start attacking the target contract.   <code>receive</code> is the default receive function which is invoked when the <code>Attacker</code> contract receives money without any payable function specified in the call message.  <code>withdraw</code> is to send all the asset of the <code>Attacker</code> contract to the deployer.
 
-The following diagram illustrates the scenario.
+An attacker deploys the <code>Attacker</code> contract, putting at least 1 ether, then steals money from the <code>Jar</code> contract in the following way.  The attacker calls <code>deposit</code> of <code>Attacker</code>; the <code>balance</code> of the <code>Jar</code> contract now keeps that the address of the contract <code>Attacker</code> has 1 ETH deposit.  Next, the attacker calls <code>attack</code>.  The execution goes to <code>withdraw</code> of <code>Jar</code>, where it first checks that the message sender, i.e. the address of the contract <code>Attacker</code> has deposited some ETH. If it is the case, the message sender is indeed a depositor.  It makes a payout to the depositor by means of <code>call</code>.
+In the course of <code>Attacker</code> contract's receiving money, its <code>receive</code> function is executed.  It checks that the <code>Jar</code> contract has at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw</code> of the <code>Jar</code> contract, which causes the so-called <i>reentrancy</i>.
+As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the <code>Jar</code> contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim subseeds 1 ETH.
 
+<!-- By <code>deposit</code>, this attacker contract makes a deposit in the target <code>Jar</code> contract.  Assuming we have made 1 ether of deposit, the <code>attack</code> funtion starts the main business of this attacker contract.  It calls <code>withdraw</code> function of the <code>Jar</code>, then the <code>Jar</code> contract sends 1 ether, the exact deposit amount, to the <code>Attacker</code> contract by means of the <code>call</code> function.  This <code>call</code> function invokes the <code>receive</code> function of the attacker contract, which again withdraw money from the <code>Jar</code> contract as long as the <code>Jar</code> contract owns at least 1 ether.  Reentering the <code>withdraw</code> function of the <code>Jar</code> contract, the balance of the attacker is still 1 ether, and hence it sends 1 ether to the attacker.  This process goes on until the asset of <code>Jar</code> subseeds 1 ether, namely, <code>Jar</code> loses nearly all its asset. -->
+<!-- The following diagram illustrates the scenario. -->
 ![reentrancy](imgs/reentrancy.png)
-
-The story goes in the following way.
-The process starts from attacker's calling <code>deposit()</code> of <code>Attacker</code>; the balance of the jar contract now keeps that the contract <code>Attacker</code> has 1 ETH deposit.  Then the attacker calls <code>attack()</code>.  The execution goes to <code>withdraw()</code> of <code>Jar</code>, where it first checks that the message sender, i.e. the contract <code>Attacker</code> has deposited some ETH, and next it makes a payout by means of <code>call()</code>; as commonly done, it transfers money by sending the empty call data, i.e. <code>""</code>, to the depositor.
-When the <code>Attacker</code> contract receives money, its <code>receive()</code> is executed.  It checks that the jar contract has at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw()</code> of the <code>Jar</code> contract, which causes the so-called <i>reentrancy</i>.
-As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the jar contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim goes less than 1 ETH.
-
-### Problem analysis
-An arbitrary address can make a deposit, calling to <code>Jar.deposit()</code> with sending money to deposit.  As <code>Jar</code> pays back money exactly to the depositor, there is a possibility of its sending money back to a smart contract rather than an EOA (externally owned account).  The prerequisite for a successful withdrawal is that the balance <code>balance[msg.sender]</code> is positive.  In the function <code>withdraw()</code>, the balance is set to be 0 after the actual money transfer, the prerequisite is samely satisfied in case of a reentrancy, hence it repeatedly sends money.  After the attacker stops the process, the the whole transaction will successfully be over without causing a revert; it just assigns <code>0</code> to <code>balance[msg.sender]</code> after all transfers were done.
-
-Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
-
-1. Preconditions of the money transfer may be satisfied in a recursive call.
-2. After carrying out the repeated money transfer, the transaction may successfully complete.
-
-<!-- Note that a use of mutex makes the above 1. unsatisfied, and that Solidity's change (version 0.8 and above) to cause a revert in case of underflow makes 2. unsatisfied. -->
-
-A commonly suggested cure for the vulnerability is to make use of mutex to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.  On the other hand, if the business logic were to subtract the amount of the transferred money, it could cause a revert due to the underflow, and as a result, all unexpected sendings could be cancelled.
 
 ## Demonstration
 
 We demonstrate the reentrancy in an actual blockchain.
 The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia testnet.
 
-
 ## Secure programming to prevent reentrancy
 
-We discuss a couple of workarounds to prevent the above unfortunate story.
+We discuss a couple of workarounds to prevent the above mentioned problem.
+<!-- An arbitrary address can make a deposit, calling to <code>Jar.deposit()</code> with sending money to deposit.  As <code>Jar</code> pays back money exactly to the depositor, there is a possibility of its sending money back to a smart contract rather than an EOA (externally owned account). -->
+Let's review how the <code>Attacker</code> contract and the <code>Jar</code> contract interact.
+The prerequisite to make a transfer is that the balance <code>balance[msg.sender]</code> is positive when <code>withdraw</code> of <code>Jar</code> is called.  There, the balance is set to be 0 after the actual money transfer has been done, hence the prerequisite is samely satisfied in case of a reentrancy.  The attacker stops the process when the amount of the asset of <code>Jar</code> got few.  It makes the whole transaction successful without causing a revert.
+<!-- 
+; it just assigns <code>0</code> to <code>balance[msg.sender]</code> after all transfers were done. -->
+
+<!-- Note that a use of mutex makes the above 1. unsatisfied, and that Solidity's change (version 0.8 and above) to cause a revert in case of underflow makes 2. unsatisfied. -->
+
+A commonly suggested cure for the vulnerability is to make use of mutex to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.
 
 ### Lock
 
@@ -138,11 +139,25 @@ By this improvement, the attacker fails because the balance of the attacker is a
 
 ### Underflow
 
-Although I this option is not a practically recommendable workaround, at least in my personal opinion, I would like to mention it because it explains the importance of recent change of the solidity language to cause revert in case of arithmetical failures such as underflow, and also how attackers attempt is foiled by a revert.
+Although this option is not a practically recommendable workaround, at least in my personal opinion, I would like to mention it because it explains the importance of recent change of the solidity language to cause revert in case of arithmetical failures such as underflow, and also how attacker's attempt is foiled by a revert.
 
-Instead of putting zero for the balance, one can subtract the amount of transfer.  Then, in the reentrancy, it causes an arithmetical underflow error because the subtrantion makes the value of balance, that is of unsigned integer type, negative.  The attacker fails because the latest solidity reverts in case of underflow; the whole transaction is reverted.
+Consider the following version of <code>withdraw</code>.
+```
+function withdraw() public {
+    uint amount = balance[msg.sender];
+    require(amount != 0, "zero balance");
+    (bool s,) = msg.sender.call{ value: amount }("");
+    require(s, "In Jar.withdrow(), call() failed.");
+    balance[msg.sender] -= amount;
+}
+```
+<!-- instead of putting 0, it causes a revert due to the underflow, since balance[msg.sender] of type unsigned integer goes below 0.  As a result, all unexpected sendings could be cancelled and the contract is secure. -->
 
-This is a working solution, but the previous options look much better becuase they show a clear intention of preventing the reentrancy.  On the other hand, this explains that a revert is an effective mechanism of secure programming.
+Instead of putting zero for the balance, it subtracts the amount of transfer, where <code>amount</code> is defined at the very beginning.  After <code>Attacker</code> stopped withdrawal, the repeated subtraction causes an arithmetical underflow, because <code>balance[msg.sender]</code> is of type unsigned integer, and the whole transaction is reverted.  As a result, all unexpected sendings are cancelled and the contract is secure against <code>Attacker</code>.
+
+<!-- error because the subtrantion makes the value of balance, that is of unsigned integer type, negative.  The attacker fails because the latest solidity reverts in case of underflow; the whole transaction is reverted. -->
+This is a working solution, but the previous options look much better becuase they show a clear intention of preventing the reentrancy.
+<!-- On the other hand, this explains that a revert is an effective mechanism of secure programming. -->
 
 # Formal verification
 
@@ -257,6 +272,13 @@ The aim of our formal modeling is:
 Currently (as of June 2024) solc doesn't offer a feature automatically to detect reentrancy vulnerability without explicit assertions in source code.
 
 We describe how the above mentioned Jar contract should be modeled in Horn clauses.  The code below follows SMTLIB2 format which theorem provers such as Z3 accepts as input.  The modeling of the contract follows existing research papers.
+
+##### aaa
+
+Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
+
+1. Preconditions of the money transfer may be satisfied in a recursive call.
+2. After carrying out the repeated money transfer, the transaction may successfully complete.
 
 We use following custom sorts for address, uint, and mapping(address=>uint).
 ```
