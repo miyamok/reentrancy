@@ -1,4 +1,4 @@
-# Demonstrating the reentrancy vulnerability of smart contracts
+# Reentrancy vulnerability of smart contracts
 
 The objective of this project is two folds.
 The one is to demonstrate the reentrancy vulnerability of smart contracts, and the second is to systematically detect a potential vulnerability of a solidity code through formal verification.
@@ -16,6 +16,7 @@ As the name suggests, it exploits a function whose execution leads to another ex
 ## Vulnerable smart contract: Coin jar
 
 The following code is a simple smart contract implmenting a coin jar.
+The expected use case is that anybody can make a deposit, and anytime in the future, the depositor can withdraw money.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
 pragma solidity >=0.6.12 <0.9.0;
@@ -40,11 +41,11 @@ contract Jar {
     }
 }
 ```
-It has two external functions, <code>deposit</code> and <code>withdraw</code>, which are respectively to deposit crypto currency to this jar contract and to withdraw one's deposit.  The state variable <code>balance</code> records which contract address has how much deposit, and it is increased as a deposit is made via the <code>deposit</code> function.  The function <code>withdraw</code> is used to withdraw all the asset which one has deposited so far.  It first checks that the balance is non-zero, send the deposit to the original asset owner (i.e. <code>msg.sender</code>), and then in case of the transfer is successful the balance is reset to zero.
+It has two external functions, <code>deposit</code> and <code>withdraw</code>, which are respectively to deposit crypto currency into this jar contract and to withdraw one's deposit.  The state variable <code>balance</code> records which contract address has how much deposit, and it is increased as a deposit is made via the <code>deposit</code> function.  The function <code>withdraw</code> is used to withdraw all the asset which one has deposited so far.  It first checks that the balance is non-zero, sends the deposit to the original asset owner (i.e. <code>msg.sender</code>), and then in case of the transfer is successful the balance is reset to zero.  In case the balance is zero or the transfer has failed, the transaction is reverted.
 
-This smart contract has a security problem due to the use of the <code>call</code> function.  Alrhough the call message is the null string (i.e. <code>""</code>), this invokes a payable function in case <code>msg.sender</code> is a smart contract, and the content of the payable function is in general unkonwn and hence arbitrary.
+This smart contract has a security problem due to the use of the <code>call</code> function.  Although the call message is the null string (i.e. <code>""</code>), this invokes a payable function in case <code>msg.sender</code> is a smart contract, and the content of the payable function is in general unknown and hence arbitrary.
 
-We are going to see that we can create a malicious contract which can steal money from the Jar contract by repeatedly calling the <code>withdraw</code> function of the Jar contract; that is why this vulnerability is called reentrancy.
+We are going to see that we can create a malicious contract which can steal money from the Jar contract by repeatedly calling the <code>withdraw</code> function of the Jar contract.
 
 ## Attacking a vulnerable contract
 The following smart contract is a successful attacker.
@@ -94,6 +95,23 @@ The following diagram illustrates the scenario.
 
 ![reentrancy](imgs/reentrancy.png)
 
+The story goes in the following way.
+The process starts from attacker's calling <code>deposit()</code> of <code>Attacker</code>; the balance of the jar contract now keeps that the contract <code>Attacker</code> has 1 ETH deposit.  Then the attacker calls <code>attack()</code>.  The execution goes to <code>withdraw()</code> of <code>Jar</code>, where it first checks that the message sender, i.e. the contract <code>Attacker</code> has deposited some ETH, and next it makes a payout by means of <code>call()</code>; as commonly done, it transfers money by sending the empty call data, i.e. <code>""</code>, to the depositor.
+When the <code>Attacker</code> contract receives money, its <code>receive()</code> is executed.  It checks that the jar contract has at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw()</code> of the <code>Jar</code> contract, which causes the so-called <i>reentrancy</i>.
+As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the jar contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim goes less than 1 ETH.
+
+### Problem analysis
+An arbitrary address can make a deposit, calling to <code>Jar.deposit()</code> with sending money to deposit.  As <code>Jar</code> pays back money exactly to the depositor, there is a possibility of its sending money back to a smart contract rather than an EOA (externally owned account).  The prerequisite for a successful withdrawal is that the balance <code>balance[msg.sender]</code> is positive.  In the function <code>withdraw()</code>, the balance is set to be 0 after the actual money transfer, the prerequisite is samely satisfied in case of a reentrancy, hence it repeatedly sends money.  After the attacker stops the process, the the whole transaction will successfully be over without causing a revert; it just assigns <code>0</code> to <code>balance[msg.sender]</code> after all transfers were done.
+
+Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
+
+1. Preconditions of the money transfer may be satisfied in a recursive call.
+2. After carrying out the repeated money transfer, the transaction may successfully complete.
+
+<!-- Note that a use of mutex makes the above 1. unsatisfied, and that Solidity's change (version 0.8 and above) to cause a revert in case of underflow makes 2. unsatisfied. -->
+
+A commonly suggested cure for the vulnerability is to make use of mutex to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.  On the other hand, if the business logic were to subtract the amount of the transferred money, it could cause a revert due to the underflow, and as a result, all unexpected sendings could be cancelled.
+
 ## Demonstration
 
 We demonstrate the reentrancy in an actual blockchain.
@@ -128,15 +146,15 @@ This is a working solution, but the previous options look much better becuase th
 
 # Formal verification
 
-As a case study, we apply formal verification in order to detect the reentrancy vulnerability of the jar contract.  We manually formalized a model of the jar contract, and use it to find a possible reentrancy which causes a change of persistent data, such as state variables of the contract and asset balances.  The safety property to check is that the change of asset balance is deterministic.  In case there is a non-determinism, we get an evidence showing a violation of the safety property.
+As a case study, we apply formal verification in order to detect the reentrancy vulnerability of the jar contract.  We manually formalized a model of the jar contract, and use it to find a possible reentrancy which causes an unexpected change of persistent data, such as state variables of the contract and its asset balance of the native cryptocurrency.  The safety property to check is that any change of persistent data is deterministic, namely, the execution results are independent from unknown external contracts.  In case the security property is violated, we get an evidence showing how it happens.
 
-The solc compiler has rich features of formal verifications due to model checking as well as SMT solving.   In order to make use of these solc features for detecting a reentrancy vulnerability, a programmer is required to put assertions properly, and that means one should know about security.
+The solc compiler has rich features of formal verifications.   In order to make use of these solc features for detecting a reentrancy vulnerability, a programmer is required to put assertions properly, which has to be based on security knowledges.
 Our case study of formal verification indeed works to the above shown vulnerable smart contract without any modification of the solidity code, namely, a programmer is required neither to know about security nor to put additional assertions for reentrancy analysis.
 
 <!-- A current drawback in comparison to existing solc formal verification is that our method may issue too many warnings, those are a kind of false positives.  It is not possible to automatically determine what kind of reentrancy should be accepted and what should not be, so we would like to leave this problem for future work.  Currently the logical model of our smart contract for formal verification is manually implemented.  The automatic model construction, that solc does for (almost) arbitrary solidity code, is missing in our side, and left for future work, too. -->
 ## Reentrancy analysis
 
-We practice formal verification by means of SMT solver concerning this security problem.
+We practice formal verification by means of SMT solver Microsoft's Z3, and we use SMTLIB2 for SMT modeling.  The following codes are used.
 
 - Solidity code of the vulnerable smart contract ([Jar.sol](Solidity/Jar.sol))
 - Solidity code of the attacker smart contract ([Attacker.sol](Solidity/Attacker.sol))
