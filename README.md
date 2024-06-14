@@ -179,20 +179,9 @@ We practice formal verification by means of SMT solver Microsoft's Z3, and we us
 
 ## Formal modeling
 
-We give formal models of Jar.sol and its variants which are free from the reentrancy vulnerability.  We use the Horn clause-based framework which is same as one employed by the official solc compiler for its built-in formal verification [[1]](#1) [[2]](#2).
-The aim of our formal modeling is:
+We have given formal models of Jar.sol and Jar_locked.sol within the framework of the constrained Horn clause which is the same as what the official solc compiler has employed for its built-in formal verification [[1]](#1) [[2]](#2).  The novelty of our work is that verification concerning the reentrancy vulnerability is carried out without additional assertions which have to be inserted into a source code by a programmer with security knowledges.
 
-1. To do verification without relying on explicit assertions in source codes which have to be done by a programmer with security knowledges, and
-2. the process to obtain a formal model and security properties from a source code is formal so that it is to automatize.
-
-We describe how the above mentioned Jar contract should be modeled in Horn clauses.  The code below follows SMTLIB2 format which theorem provers such as Z3 accepts as input.  The modeling of the contract follows existing research papers.
-
-##### aaa
-
-Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
-
-1. Preconditions of the money transfer may be satisfied in a recursive call.
-2. After carrying out the repeated money transfer, the transaction may successfully complete.
+We describe how the above mentioned Jar contract are modeled in the SMTLIB2 format which SMT solvers such as Z3 accept as input.  The modeling of the contract follows existing research papers.
 
 We use following custom sorts for address, uint, and mapping(address=>uint).
 ```
@@ -359,7 +348,12 @@ Considering the lifetime of the contract, it has the initial state and the state
 		  (= r 0))
 	     (Jar b^ tb^))))
 ```
-Here we are at the last step of formal modeling, that is to give the security property to detect the reentrancy vulnerability.
+We have formalized the smart contract.  We are at the last step, that is to model the security property to detect the reentrancy vulnerability.
+<!-- 
+Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
+
+1. Preconditions of the money transfer may be satisfied in a recursive call.
+2. After carrying out the repeated money transfer, the transaction may successfully complete. -->
 ```
 (assert
  (forall ((b M) (tb BUINT) (s A) (v BUINT)
@@ -379,7 +373,7 @@ This security proprty is not very optimal in the sense that it causes false posi
 - Generation of an invariance is not straightforward in a general case.  We prefer to leave it for future work
 - We have faced a limit of computational power of the machine in case the assertion makes use of an invariance (still non-terminating in half a day of Z3 execution).  We should keep the problem manageable in seconds.
 
-### Experiment
+## Experiment
 
 We are going to see how to practice formal verification by means of an SMT solver, that requires some optimization and modification due to a computational limitation etc.  At the end, we managed to get an evidence showing that our jar contract is indeed vulnerable due to reentrancy as follows:
 
@@ -407,7 +401,7 @@ In order to let the size of the balance array small, we give a custom definition
 is used to represent the case there is only one account holder in our system.
 For the asset, we used the bitvector of length 2 representing numbers {0, 1, 2, 3}.
 
-### Unsatisfiability proof
+## Unsatisfiability proof
 
 Z3 provides the following proof of unsatisfiability in seconds.  We are going to read off that it demonstrates the above mentioned divergent behaviors.
 ```
@@ -516,14 +510,10 @@ Then, to prove <code>query!0 A D B C L K 0 0 H G</code>, the head of the Horn cl
 which is straightforwardly implied from the conjunction formula <code>$x997</code> by means of the assertions concerning Jar, T, Q_1, Q_2, Q_3, and Q_omega in our model.  Notice that the premises concerning <code>Ext</code> is necessary as the body of the clause concerning Q_3 involves it.  By resolution, the body of the Horn clause <code>$x999</code> is all proven, thanks to the additionally supplied proofs <code>@x2953</code> and <code>@x3082</code>, which respectively claim <code>Ext([1], 2, [0], 1)</code> and <code>Ext([1], 2, [1], 2)</code>, and it gives a proof of <code>$x2931</code>, that is <code>query!0([1], 3, unit, 0, [0], 1, 0, 0, [0], 2)</code>.
 It means that there are two diverging transactions as mentioned at the beginning of this section, and moreover it contradits the asserted security property.
 
-### Implementation
+## Implementation
 
 TODO: automatically generate a model and a security property for a given source code, so that a theorem prover practices formal verification.
 
-### Notes
-
-- getting proof trees from Spacer (https://github.com/Z3Prover/z3/issues/4863)
-- proof rules documented (https://github.com/Z3Prover/z3/blob/master/src/api/z3_api.h#L765)
 
 <!-- 1. There is a function, which not only allows reentrancy but also makes a money transfer to some address which may be a smart contract created by somebody.  (May be viewed as a special case of the 2. below.)
 2. In this function, preconditions to the money transfer may be satisfied in a recursive call.
@@ -531,12 +521,15 @@ TODO: automatically generate a model and a security property for a given source 
 
 <!-- variables used to form a condition (maybe no such variable) to decide whether it should send money or not aren't get changed before the line of money transfer. -->
 
-### External links
 
+## External links
+
+- getting proof trees from Spacer (https://github.com/Z3Prover/z3/issues/4863)
+- proof rules documented (https://github.com/Z3Prover/z3/blob/master/src/api/z3_api.h#L765)
 - https://www.alchemy.com/overviews/reentrancy-attack-solidity
 - https://hackernoon.com/hack-solidity-reentrancy-attack
 
-### References
+## References
 
 <a id="1">[1]</a>
 Leonardo Alt, Martin Blicha, Antti E. J. Hyvärinen, Natasha Sharygina:
