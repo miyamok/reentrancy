@@ -168,7 +168,6 @@ Our case study of formal verification indeed works to the above shown vulnerable
 Currently (as of June 2024) solc doesn't offer a feature automatically to detect reentrancy vulnerability without explicit assertions in source code.
 
 <!-- A current drawback in comparison to existing solc formal verification is that our method may issue too many warnings, those are a kind of false positives.  It is not possible to automatically determine what kind of reentrancy should be accepted and what should not be, so we would like to leave this problem for future work.  Currently the logical model of our smart contract for formal verification is manually implemented.  The automatic model construction, that solc does for (almost) arbitrary solidity code, is missing in our side, and left for future work, too. -->
-## Reentrancy analysis
 
 We practice formal verification by means of SMT solver Microsoft's Z3, and we use SMTLIB2 for SMT modeling.  The following codes are used.
 
@@ -178,7 +177,7 @@ We practice formal verification by means of SMT solver Microsoft's Z3, and we us
 - Solidity code of the secure smart contract ([Jar_locked.sol](Solidity/Jar_locked.sol))
 - SMTLIB2 model of the secure smart contract and the security property ([jar_locked.smt](smt/jar_locked.smt))
 
-### Formal modeling
+## Formal modeling
 
 We give formal models of Jar.sol and its variants which are free from the reentrancy vulnerability.  We use the Horn clause-based framework which is same as one employed by the official solc compiler for its built-in formal verification [[1]](#1) [[2]](#2).
 The aim of our formal modeling is:
