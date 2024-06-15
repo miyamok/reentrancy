@@ -2,12 +2,8 @@
 pragma solidity >=0.6.12 <0.9.0;
 
 contract Jar {
-
     mapping(address=>uint) public balance;
-
-    constructor() payable {
-
-    }
+    constructor() payable {}
 
     function deposit() public payable {
         balance[msg.sender] += msg.value;

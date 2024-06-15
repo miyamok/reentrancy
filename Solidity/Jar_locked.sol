@@ -2,13 +2,9 @@
 pragma solidity >=0.6.12 <0.9.0;
 
 contract Jar {
-
     mapping(address=>uint) public balance;
     bool locked;
-
-    constructor() payable {
-
-    }
+    constructor() payable {}
 
     function deposit() public payable {
         require(!locked, "deposit(): reentrancy not allowed");
@@ -22,7 +18,7 @@ contract Jar {
         (bool s,) = msg.sender.call{ value: balance[msg.sender] }("");
         require(s, "In Jar.withdraw(), call() failed.");
         balance[msg.sender] = 0;
-	locked = false;
+        locked = false;
     }
 }
 
