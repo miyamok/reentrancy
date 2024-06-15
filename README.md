@@ -101,10 +101,6 @@ An attacker deploys the <code>Attacker</code> contract, putting at least 1 ether
 In the course of <code>Attacker</code> contract's receiving money, its <code>receive</code> function is executed.  It checks that the <code>Jar</code> contract has at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw</code> of the <code>Jar</code> contract, which causes the so-called <i>reentrancy</i>.
 As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the <code>Jar</code> contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim subceeds 1 ETH.
 
-<!-- By <code>deposit</code>, this attacker contract makes a deposit in the target <code>Jar</code> contract.  Assuming we have made 1 ether of deposit, the <code>attack</code> function starts the main business of this attacker contract.  It calls <code>withdraw</code> function of the <code>Jar</code>, then the <code>Jar</code> contract sends 1 ether, the exact deposit amount, to the <code>Attacker</code> contract by means of the <code>call</code> function.  This <code>call</code> function invokes the <code>receive</code> function of the attacker contract, which again withdraw money from the <code>Jar</code> contract as long as the <code>Jar</code> contract owns at least 1 ether.  Reentering the <code>withdraw</code> function of the <code>Jar</code> contract, the balance of the attacker is still 1 ether, and hence it sends 1 ether to the attacker.  This process goes on until the asset of <code>Jar</code> subceeds 1 ether, namely, <code>Jar</code> loses nearly all its asset. -->
-<!-- The following diagram illustrates the scenario. -->
-<!-- ![reentrancy](imgs/reentrancy.png) -->
-
 ## Demonstration
 
 We demonstrate the reentrancy in an actual blockchain.
@@ -113,13 +109,8 @@ The full source code relies on various technologies such as solidity, hardhat, a
 ## Secure programming to prevent reentrancy
 
 We discuss a couple of workarounds to prevent the above mentioned problem.
-<!-- An arbitrary address can make a deposit, calling to <code>Jar.deposit()</code> with sending money to deposit.  As <code>Jar</code> pays back money exactly to the depositor, there is a possibility of its sending money back to a smart contract rather than an EOA (externally owned account). -->
 Let's review how the <code>Attacker</code> contract and the <code>Jar</code> contract interact.
 The prerequisite to make a transfer is that the balance <code>balance[msg.sender]</code> is positive when <code>withdraw</code> of <code>Jar</code> is called.  There, the balance is set to be 0 after the actual money transfer has been done, hence the prerequisite is satisfied in case of a reentrancy as well.  The attacker stops the process when the amount of the asset of <code>Jar</code> got few.  It makes the whole transaction successful without causing a revert.
-<!-- 
-; it just assigns <code>0</code> to <code>balance[msg.sender]</code> after all transfers were done. -->
-
-<!-- Note that a use of mutex makes the above 1. unsatisfied, and that Solidity's change (version 0.8 and above) to cause a revert in case of underflow makes 2. unsatisfied. -->
 
 A commonly suggested cure for the vulnerability is to make use of mutex to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.
 
@@ -151,13 +142,7 @@ function withdraw() public {
     balance[msg.sender] -= amount;
 }
 ```
-<!-- instead of putting 0, it causes a revert due to the underflow, since balance[msg.sender] of type unsigned integer goes below 0.  As a result, all unexpected transfers could be canceled and the contract is secure. -->
-
 Instead of putting zero for the balance, it subtracts the amount of transfer, where <code>amount</code> is defined at the very beginning.  After <code>Attacker</code> stopped withdrawal, the repeated subtraction causes an arithmetical underflow, because <code>balance[msg.sender]</code> is of type unsigned integer, and the whole transaction is reverted.  As a result, all unexpected transfers are canceled and the contract is secure against <code>Attacker</code>.
-
-<!-- error because the subtraction makes the value of balance, that is of unsigned integer type, negative.  The attacker fails because the latest solidity reverts in case of underflow; the whole transaction is reverted. -->
-This is a working solution, but the previous options look much better because they show a clear intention of preventing the reentrancy.
-<!-- On the other hand, this explains that a revert is an effective mechanism of secure programming. -->
 
 # Formal verification
 
@@ -166,8 +151,6 @@ As a case study, we apply formal verification in order to detect the reentrancy 
 The solc compiler has rich features for formal verifications.   In order to detect a reentrancy vulnerability, making use of these solc features, it requires a programmer to put additional assertions properly, which has to be based on security knowledges.
 Our case study of formal verification indeed works to the above shown vulnerable smart contract without an additional assertions, namely, a programmer is required to know about security, neither.
 Currently (as of June 2024) solc doesn't offer a feature automatically to detect reentrancy vulnerability without explicit assertions in source code.
-
-<!-- A current drawback in comparison to existing solc formal verification is that our method may issue too many warnings, those are a kind of false positives.  It is not possible to automatically determine what kind of reentrancy should be accepted and what should not be, so we would like to leave this problem for future work.  Currently the logical model of our smart contract for formal verification is manually implemented.  The automatic model construction, that solc does for (almost) arbitrary solidity code, is missing in our side, and left for future work, too. -->
 
 We practice formal verification by means of SMT solver Microsoft's Z3, and we use SMTLIB2 for SMT modeling.  The following codes are used.
 
@@ -513,13 +496,6 @@ It means that there are two diverging transactions as mentioned at the beginning
 ## Implementation
 
 TODO: automatically generate a model and a security property for a given source code, so that a theorem prover practices formal verification.
-
-
-<!-- 1. There is a function, which not only allows reentrancy but also makes a money transfer to some address which may be a smart contract created by somebody.  (May be viewed as a special case of the 2. below.)
-2. In this function, preconditions to the money transfer may be satisfied in a recursive call.
-3. After carrying out the money transfer, it may complete all the recursive function calls without a revert. -->
-
-<!-- variables used to form a condition (maybe no such variable) to decide whether it should send money or not aren't get changed before the line of money transfer. -->
 
 ## Future work
 
