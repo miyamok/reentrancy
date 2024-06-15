@@ -2,7 +2,7 @@
 
 The objective of this project is two folds.
 The one is to demonstrate the reentrancy vulnerability of smart contracts, and the second is to systematically detect a potential vulnerability of a solidity code through formal verification.
-The solidity compiler solc has already equipped rich formal verification features due to model checkers and SMT solvers, but in order to carry out it for the reentrancy issue, a programmer has to be aware of such potential problems and explicitly put assertions in a source code, that surely requires skills for secure programming.  For this project, we don't suppose that programmers have such skills, and I am going to offer a prototypical solution for them, so that they get a warning of a presence of potential reentrancy vulnerability in their code wihtout any prerequisite secure programming knowdledge.
+The solidity compiler solc has already equipped rich formal verification features due to model checkers and SMT solvers, but in order to carry out it for the reentrancy issue, a programmer has to be aware of such potential problems and explicitly put assertions in a source code, that surely requires skills for secure programming.  For this project, we don't suppose that programmers have such skills, and I am going to offer a prototypical solution for them, so that they get a warning of a presence of potential reentrancy vulnerability in their code without any prerequisite secure programming knowledge.
 
 The rest of this document is organized as follows.  We first review what the reentrancy problem is.  There, we are going to see a running example of a vulnerable contract and an attacker contract, and a couple of security tips to prevent the problem.  Then we apply a formal verification technique due to an SMT solver Z3 to find that our contract is indeed vulnerable and also that a secure programming workaround manages the security vulnerability.  We also go through a minimal background of formal verification.
 
@@ -10,12 +10,12 @@ The full source codes for this project is published on github.
 
 # Reentrancy
 
-The reentrancy is a cause of security problem which leads to a massive finnancial loss.
+The reentrancy is a cause of security problem which leads to a massive financial loss.
 As the name suggests, it exploits a function whose execution leads to another execution of itself.  Let's take a look at a running example of a vulnerable solidity code.
 
 ## Vulnerable smart contract: Coin jar
 
-The following code is a simple smart contract implmenting a coin jar.
+The following code is a simple smart contract implementing a coin jar.
 The expected use case is that anybody can make a deposit, and anytime in the future, the depositor can withdraw money.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
@@ -36,7 +36,7 @@ contract Jar {
     function withdraw() external {
         require(balance[msg.sender] != 0, "zero balance");
         (bool s,) = msg.sender.call{ value: balance[msg.sender] }("");
-        require(s, "In Jar.withdrow(), call() failed.");
+        require(s, "In Jar.withdraw(), call() failed.");
         balance[msg.sender] = 0;
     }
 }
@@ -47,7 +47,7 @@ This smart contract has a security problem due to the use of the <code>call</cod
 ```
 addr.call{ value: amount }("")
 ```
-where <code>addr</code> is the distination address, <code>amount</code> is the amount to send in unsigned integer, and the nullstring (i.e. <code>""</code>) is to designate that it specifies no particular function of <code>addr</code> to call.  In order to make a particular function call, a call message in the abi format should be given instead of the nullstring (cf. https://solidity-by-example.org/call/).
+where <code>addr</code> is the destination address, <code>amount</code> is the amount to send in unsigned integer, and the nullstring (i.e. <code>""</code>) is to designate that it specifies no particular function of <code>addr</code> to call.  In order to make a particular function call, a call message in the abi format should be given instead of the nullstring (cf. https://solidity-by-example.org/call/).
 
 There is a problem if <code>msg.sender</code> is a smart contract.  Even if the call message is the null string, this invokes a payable function of the smart contract <code>msg.sender</code>.  The content of the payable function is in general unknown and hence we have to assume an arbitrary code is executed.
 
@@ -97,25 +97,25 @@ contract Attacker {
 ```
 <code>IJar</code> is the interface to use <code>Jar</code>.  The constructor is payable and has one argument for the address; the target Jar contract should be provided at the time of deployment.  <code>deposit</code> is the function for the <code>Attacker</code> contract to make a 1 ether deposit into the Jar contract.  <code>attack</code> is the function to start attacking the target contract.   <code>receive</code> is the default receive function which is invoked when the <code>Attacker</code> contract receives money without any payable function specified in the call message.  <code>withdraw</code> is to send all the asset of the <code>Attacker</code> contract to the deployer.
 
-An attacker deploys the <code>Attacker</code> contract, putting at least 1 ether, then steals money from the <code>Jar</code> contract in the following way.  The attacker calls <code>deposit</code> of <code>Attacker</code>; the <code>balance</code> of the <code>Jar</code> contract now keeps that the address of the contract <code>Attacker</code> has 1 ETH deposit.  Next, the attacker calls <code>attack</code>.  The execution goes to <code>withdraw</code> of <code>Jar</code>, where it first checks that the message sender, i.e. the address of the contract <code>Attacker</code> has deposited some ETH. If it is the case, the message sender is indeed a depositor.  It makes a payout to the depositor by means of <code>call</code>.
+An attacker deploys the <code>Attacker</code> contract, putting at least 1 ether, then steals money from the <code>Jar</code> contract in the following way.  The attacker calls <code>deposit</code> of <code>Attacker</code>; the <code>balance</code> of the <code>Jar</code> contract now keeps that the address of the contract <code>Attacker</code> has 1 ETH deposit.  Next, the attacker calls <code>attack</code>.  The execution goes to <code>withdraw</code> of <code>Jar</code>, where it first checks that the message sender, i.e. the address of the contract <code>Attacker</code> has deposited some ETH. If it is the case, the message sender is indeed a depositor.  It makes a pay-out to the depositor by means of <code>call</code>.
 In the course of <code>Attacker</code> contract's receiving money, its <code>receive</code> function is executed.  It checks that the <code>Jar</code> contract has at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw</code> of the <code>Jar</code> contract, which causes the so-called <i>reentrancy</i>.
-As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the <code>Jar</code> contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim subseeds 1 ETH.
+As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the <code>Jar</code> contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim subceeds 1 ETH.
 
-<!-- By <code>deposit</code>, this attacker contract makes a deposit in the target <code>Jar</code> contract.  Assuming we have made 1 ether of deposit, the <code>attack</code> funtion starts the main business of this attacker contract.  It calls <code>withdraw</code> function of the <code>Jar</code>, then the <code>Jar</code> contract sends 1 ether, the exact deposit amount, to the <code>Attacker</code> contract by means of the <code>call</code> function.  This <code>call</code> function invokes the <code>receive</code> function of the attacker contract, which again withdraw money from the <code>Jar</code> contract as long as the <code>Jar</code> contract owns at least 1 ether.  Reentering the <code>withdraw</code> function of the <code>Jar</code> contract, the balance of the attacker is still 1 ether, and hence it sends 1 ether to the attacker.  This process goes on until the asset of <code>Jar</code> subseeds 1 ether, namely, <code>Jar</code> loses nearly all its asset. -->
+<!-- By <code>deposit</code>, this attacker contract makes a deposit in the target <code>Jar</code> contract.  Assuming we have made 1 ether of deposit, the <code>attack</code> function starts the main business of this attacker contract.  It calls <code>withdraw</code> function of the <code>Jar</code>, then the <code>Jar</code> contract sends 1 ether, the exact deposit amount, to the <code>Attacker</code> contract by means of the <code>call</code> function.  This <code>call</code> function invokes the <code>receive</code> function of the attacker contract, which again withdraw money from the <code>Jar</code> contract as long as the <code>Jar</code> contract owns at least 1 ether.  Reentering the <code>withdraw</code> function of the <code>Jar</code> contract, the balance of the attacker is still 1 ether, and hence it sends 1 ether to the attacker.  This process goes on until the asset of <code>Jar</code> subceeds 1 ether, namely, <code>Jar</code> loses nearly all its asset. -->
 <!-- The following diagram illustrates the scenario. -->
 <!-- ![reentrancy](imgs/reentrancy.png) -->
 
 ## Demonstration
 
 We demonstrate the reentrancy in an actual blockchain.
-The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia testnet.
+The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia test net.
 
 ## Secure programming to prevent reentrancy
 
 We discuss a couple of workarounds to prevent the above mentioned problem.
 <!-- An arbitrary address can make a deposit, calling to <code>Jar.deposit()</code> with sending money to deposit.  As <code>Jar</code> pays back money exactly to the depositor, there is a possibility of its sending money back to a smart contract rather than an EOA (externally owned account). -->
 Let's review how the <code>Attacker</code> contract and the <code>Jar</code> contract interact.
-The prerequisite to make a transfer is that the balance <code>balance[msg.sender]</code> is positive when <code>withdraw</code> of <code>Jar</code> is called.  There, the balance is set to be 0 after the actual money transfer has been done, hence the prerequisite is samely satisfied in case of a reentrancy.  The attacker stops the process when the amount of the asset of <code>Jar</code> got few.  It makes the whole transaction successful without causing a revert.
+The prerequisite to make a transfer is that the balance <code>balance[msg.sender]</code> is positive when <code>withdraw</code> of <code>Jar</code> is called.  There, the balance is set to be 0 after the actual money transfer has been done, hence the prerequisite is satisfied in case of a reentrancy as well.  The attacker stops the process when the amount of the asset of <code>Jar</code> got few.  It makes the whole transaction successful without causing a revert.
 <!-- 
 ; it just assigns <code>0</code> to <code>balance[msg.sender]</code> after all transfers were done. -->
 
@@ -125,8 +125,8 @@ A commonly suggested cure for the vulnerability is to make use of mutex to prohi
 
 ### Lock
 
-A common solution is to use a lock object, which creates a critical region in the source code to prevent the unwelcomed execution through reentrancy.
-Typically a lock object is a state variable of integer or boolean type.  Using boolean, it becomes true before it enters a critical region and false after the region, and in case it is already true before the critical region, the execution cannot enter the region.  A use of interger allows more flexibility by specifying the maximal number more than one for reentrancy, rather than exactly one in case of boolean.
+A common solution is to use a lock object, which creates a critical region in the source code to prevent the unexpected execution through reentrancy.
+Typically a lock object is a state variable of integer or boolean type.  Using boolean, it becomes true before it enters a critical region and false after the region, and in case it is already true before the critical region, the execution cannot enter the region.  A use of integer allows more flexibility by specifying the maximal number more than one for reentrancy, rather than exactly one in case of boolean.
 In the <code>Jar</code> contract, the line of <code>msg.sender.call</code> should be a crucial part of the critical region.
 An easy way of implementing it is to use <code>ReentranceGuard</code> of openzeppelin (https://github.com/binodnp/openzeppelin-solidity/blob/master/docs/ReentrancyGuard.md).
 They provide a modifier <code>nonReentrant</code> which should be applied to a function.  In our example, the <code>withdraw</code> function is a right candidate to get this modifier, so that the whole content, surely including the above mentioned critical line, is under the control of the lock object.
@@ -147,16 +147,16 @@ function withdraw() public {
     uint amount = balance[msg.sender];
     require(amount != 0, "zero balance");
     (bool s,) = msg.sender.call{ value: amount }("");
-    require(s, "In Jar.withdrow(), call() failed.");
+    require(s, "In Jar.withdraw(), call() failed.");
     balance[msg.sender] -= amount;
 }
 ```
-<!-- instead of putting 0, it causes a revert due to the underflow, since balance[msg.sender] of type unsigned integer goes below 0.  As a result, all unexpected sendings could be cancelled and the contract is secure. -->
+<!-- instead of putting 0, it causes a revert due to the underflow, since balance[msg.sender] of type unsigned integer goes below 0.  As a result, all unexpected transfers could be canceled and the contract is secure. -->
 
-Instead of putting zero for the balance, it subtracts the amount of transfer, where <code>amount</code> is defined at the very beginning.  After <code>Attacker</code> stopped withdrawal, the repeated subtraction causes an arithmetical underflow, because <code>balance[msg.sender]</code> is of type unsigned integer, and the whole transaction is reverted.  As a result, all unexpected sendings are cancelled and the contract is secure against <code>Attacker</code>.
+Instead of putting zero for the balance, it subtracts the amount of transfer, where <code>amount</code> is defined at the very beginning.  After <code>Attacker</code> stopped withdrawal, the repeated subtraction causes an arithmetical underflow, because <code>balance[msg.sender]</code> is of type unsigned integer, and the whole transaction is reverted.  As a result, all unexpected transfers are canceled and the contract is secure against <code>Attacker</code>.
 
-<!-- error because the subtrantion makes the value of balance, that is of unsigned integer type, negative.  The attacker fails because the latest solidity reverts in case of underflow; the whole transaction is reverted. -->
-This is a working solution, but the previous options look much better becuase they show a clear intention of preventing the reentrancy.
+<!-- error because the subtraction makes the value of balance, that is of unsigned integer type, negative.  The attacker fails because the latest solidity reverts in case of underflow; the whole transaction is reverted. -->
+This is a working solution, but the previous options look much better because they show a clear intention of preventing the reentrancy.
 <!-- On the other hand, this explains that a revert is an effective mechanism of secure programming. -->
 
 # Formal verification
@@ -206,7 +206,7 @@ we declare boolean valued functions are to model functions deposit() and withdra
 (declare-fun Jar (M BUINT) Bool)
 (declare-fun Init (M BUINT) Bool)
 ```
-deposit() is modeled by P_alpha, P_omega, and S.
+<code>deposit</code> is modeled by P_alpha, P_omega, and S.
 We take each function execution as step by step state transitions.
 For this deposit(), 2 such states suffice, and hence we have two functions P_alpha and P_omega, respectively.  On the other hand, S is to model state updates due to executing deposit().  In principle, it determines whether there was a revert or not, and if so, it restores the original states to cancel the transaction, and otherwise, it updates the states.  Here we show the Horn clauses for P_alpha and P_omega.
 ```
@@ -368,7 +368,7 @@ Based on the above observation, our static program analyzer should issue a warni
 ```
 This models that the result of a call to withdraw() is deterministic.  In case this property is violated, the SMT solver answers unsat and gives a proof log showing that there are two distinct results although the function call has started from the identical situation, the state (b, tb), by the caller s, the amount of sent native currency v, and has ended without a revert.
 
-This security proprty is not very optimal in the sense that it causes false positive in the detection of the reentrancy vulnerability.  For example, it is better to make use of an invariance concerning the balances.  However, we employ the above mentioned assertion due to the following reasons.
+This security property is not very optimal in the sense that it causes false positive in the detection of the reentrancy vulnerability.  For example, it is better to make use of an invariance concerning the balances.  However, we employ the above mentioned assertion due to the following reasons.
 
 - Generation of an invariance is not straightforward in a general case.  We prefer to leave it for future work
 - We have faced a limit of computational power of the machine in case the assertion makes use of an invariance (still non-terminating in half a day of Z3 execution).  We should keep the problem manageable in seconds.
@@ -508,7 +508,7 @@ Then, to prove <code>query!0 A D B C L K 0 0 H G</code>, the head of the Horn cl
 & not ((L = H) & (K = G))
 ```
 which is straightforwardly implied from the conjunction formula <code>$x997</code> by means of the assertions concerning Jar, T, Q_1, Q_2, Q_3, and Q_omega in our model.  Notice that the premises concerning <code>Ext</code> is necessary as the body of the clause concerning Q_3 involves it.  By resolution, the body of the Horn clause <code>$x999</code> is all proven, thanks to the additionally supplied proofs <code>@x2953</code> and <code>@x3082</code>, which respectively claim <code>Ext([1], 2, [0], 1)</code> and <code>Ext([1], 2, [1], 2)</code>, and it gives a proof of <code>$x2931</code>, that is <code>query!0([1], 3, unit, 0, [0], 1, 0, 0, [0], 2)</code>.
-It means that there are two diverging transactions as mentioned at the beginning of this section, and moreover it contradits the asserted security property.
+It means that there are two diverging transactions as mentioned at the beginning of this section, and moreover it contradicts the asserted security property.
 
 ## Implementation
 
@@ -521,6 +521,15 @@ TODO: automatically generate a model and a security property for a given source 
 
 <!-- variables used to form a condition (maybe no such variable) to decide whether it should send money or not aren't get changed before the line of money transfer. -->
 
+## Future work
+
+We can think about a security property which makes use of an invariance.
+For example, the difference between the amount of the asset of the Jar contract and the total sum of the deposit is constant, as long as we have calls to <code>deposit</code> and <code>withdraw</code>.
+Although such an invariance is very useful to write down an optimal security property, we did not use it because Z3 could not manage the SAT solving in a reasonable time frame (we gave up after half a day running).
+As a future work, we will try other SMT solvers and theorem provers to overcome this issue.  We already tried the SMT solver cvc5, but it did not show any better performance over Z3 for our particular problem.
+In order for fully automatic verification, an extraction of invariance is necessary.
+We used a modified model to let Z3 finish the task in a reasonable time frame. Concretely speaking, the state variable <code>balance</code> of type <code>mapping(address=>uint)</code> was modeled by an array of the length 1.  Although it is apparent that the obtained violation result of the security property does violate the security property in the unmodified model for our particular case, a soundness result of such model abstraction in general should be useful.
+Concerning implementation, solc has already had features to generate CHC models from Solidity source codes.  Ideally, our future implementation work should be integrated with solc.
 
 ## External links
 
