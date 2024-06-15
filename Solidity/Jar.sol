@@ -16,7 +16,7 @@ contract Jar {
     function withdraw() public {
         require(balance[msg.sender] != 0, "zero balance");
         (bool s,) = msg.sender.call{ value: balance[msg.sender] }("");
-        require(s, "In Jar.withdrow(), call() failed.");
+        require(s, "In Jar.withdraw(), call() failed.");
         balance[msg.sender] = 0;
     }
 }
