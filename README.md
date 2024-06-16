@@ -104,7 +104,7 @@ As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the <
 ## Demonstration
 
 We demonstrate the reentrancy in an actual blockchain.
-The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia test net.
+The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia test net as well as on the remix IDE (https://remix.ethereum.org/).
 
 ## Secure programming to prevent reentrancy
 
@@ -383,7 +383,7 @@ This security property is not very optimal in the sense that it causes false pos
 
 ## Experiment
 
-We are going to see how to practice formal verification by means of an SMT solver, that requires some optimization and modification due to a computational limitation etc.  At the end, we managed to get an evidence showing that our jar contract is indeed vulnerable due to reentrancy as follows:
+We are going to see how to practice formal verification by means of the SMT solver Z3.  In case we get a satisfiability result, the contract is secure.  If the model in conjunction with the security property is unsatisfiable, Z3 provides a proof which is an evidence of the violation of the security property.  At the end, we managed to get an evidence showing that our jar contract causes a financial loss due to the reentrancy vulnerability as follows:
 
 - Assume the contract has the state ([1], 3), meaning that an account (say the account 0) has its deposit which amounts to 1 and the asset balance of the jar contract amounts to 3.
 - Distinct transactions may happen when the account 0 calls withdraw():
@@ -392,7 +392,8 @@ We are going to see how to practice formal verification by means of an SMT solve
 - Although withdraw() is supposed to pay back to the caller the exact amount of the deposit, that is 1, the contract may pay back 2.
 - This divergence comes from two distinct external behaviors, to ([0], 1) and to ([1], 2) from the state ([1], 2), are possible through a call to <code>msg.sender.call()</code> in <code>withdraw()</code>.
 
-We will discuss the details of 
+<!-- We will discuss the details of -->
+It requires some optimization and modification of the model, in order to get an interesting vulnerability scenario, for instance, deactivating a Horn clause describing the external behavior of Jar due to the <code>deposit</code> function which is indeed innocent.
 Executing Z3 for the model and the security property mentioned above, I didn't get an answer from Z3 in a reasonable time consumption (after half a day, I gave up).
 The following version of the definition of Init enabled me to get an answer in a few seconds.
 ```
@@ -408,6 +409,9 @@ In order to let the size of the balance array small, we give a custom definition
 ```
 is used to represent the case there is only one account holder in our system.
 For the asset, we used the bitvector of length 2 representing numbers {0, 1, 2, 3}.
+
+<!-- The Horn clauses concerning the predicate <code>Ext</code> are in charge of describing the external behavior of the Jar contract.  It's not always the case that we need to make use of all of them, in order to get an unsatisfiability result, i.e. the contract is not secure.  We may use a proper subset of those Horn clauses to get an optimal unsatisfiability proof.  In fact, we deactivate the Horn clause corresponding to <code>deposit</code>, and get an unsatisfiability proof illustrating the case causing a financial loss.  Needless to say, we need to activate all Horn clauses to show the satisfiability result. -->
+
 
 ## Unsatisfiability proof
 
@@ -457,7 +461,7 @@ not (Jar([1], 3)
      & 0=0
      & not ([0] = [0] & 1 = 2))
 ```
-It is now clear that this proof is considering the case when the contract's status is <code>([1], 3)</code>; the balance <code>[1]</code> indicates that the 0th account holder has the deposit which amounts to 1, and the asset of the contract amounts to 3.  It is apparently true because we have the assertion which makes Jar hold for an arbitrary state.  Also, there are two transitions by <code>withdraw()</code> function.  One makes the state of the contract <code>([0], 1)</code> and the other makes <code>([0], 2)</code> without no revert, as the 7th argument of T which stands for the revert flag is 0 in the both cases.  Because <code>1=2</code> in the above formula is false, the last conjunct is true.  Note that a proof of falsity is desired in our unsatisfiability proof.  We are going to check that the two formulas of <code>T</code> are both shown true in the proof, then the negation of true, ie. false, is proven.
+It is now clear that this proof is considering the case when the contract's status is <code>([1], 3)</code>; the balance <code>[1]</code> indicates that the 0th account holder has the deposit which amounts to 1, and the asset of the contract amounts to 3.  It is apparently true because we have the assertion which makes Jar hold for an arbitrary state.  Also, there are two transitions by <code>withdraw()</code> function.  One makes the state of the contract <code>([0], 1)</code> and the other makes <code>([0], 2)</code> without no revert, as the 7th argument of T which stands for the revert flag is 0 in the both cases.  Because <code>1=2</code> in the above formula is false, the last conjunct is true.  Note that a proof of falsity is desired in our unsatisfiability proof.  We are going to check that the two formulas of <code>T</code> are both shown true in the proof, then the negation of true, i.e. false, is proven.
 
 <code>$x534</code> is a formula <code>forall A, B(Ext(A, B, A, B))</code>.
 
@@ -496,7 +500,7 @@ The kernel of the quantifier is of the form <code>$x997 => (query!0 A D B C L K 
 & (not (L = H) | not (K = G))
 & (select A B <= D)
 ```
-Now we come to the final steps of the whole proof, which derives by modus ponens <code>mp</code> falsum from the proof of <code>$x2931</code> and the proof of its negation, ie. <code>$x2931 => false</code>.  The latter one is indeed corresponding to the double negated goal formula of ours in the original SMT script.
+Now we come to the final steps of the whole proof, which derives by modus ponens <code>mp</code> falsum from the proof of <code>$x2931</code> and the proof of its negation, i.e. <code>$x2931 => false</code>.  The latter one is indeed corresponding to the double negated goal formula of ours in the original SMT script.
 The former proof is due to resolution.  The first argument is a proof of <code>$x999</code>.  Recall that <code>query!0</code> is a boolean valued function, and this boolean value is meant for the negation of the security property.  In order to prove it, it suffices to prove the conjunction formula inside the kernel of the security property formula.
 ```
   Jar b tb
@@ -521,11 +525,11 @@ It means that there are two diverging transactions as mentioned at the beginning
 ## Satisfiable result for secure Jar
 
 Thanks to the lock object, the reentrancy is prevented and we get a satisfiable result of Z3, which means that there is no concern about the reentrancy vulnerability.
-In order for a fully automated verification, <code>deposit</code> is also locked as well as <code>withdraw</code> is.  It makes it impossible to make a deposit while a procedure of withdrawal.  This is harmless to prohibit such a thing, and we consider this additional lock of <code>deposit</code> is acceptable.
+In order for a fully automated verification, <code>deposit</code> is also locked as well as <code>withdraw</code> is.  It makes it impossible to make a deposit while a procedure of withdrawal.  This is harmless to prohibit such a thing, and we consider this additional lock of <code>deposit</code> is acceptable.  The SMT model for the fixed Jar contract doesn't require any new feature.  Just several more Horn clauses are needed.
 
-## Implementation
+<!-- ## Implementation
 
-TODO: automatically generate a model and a security property for a given source code, so that a theorem prover practices formal verification.
+TODO: automatically generate a model and a security property for a given source code, so that a theorem prover practices formal verification. -->
 
 ## Future work
 
