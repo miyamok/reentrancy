@@ -1,21 +1,22 @@
 # Reentrancy vulnerability of smart contracts
 
-The objective of this project is two folds.
-The one is to demonstrate the reentrancy vulnerability of smart contracts, and the second is to systematically detect a potential vulnerability of a solidity code through formal verification.
-The solidity compiler solc has already equipped rich formal verification features due to model checkers and SMT solvers, but in order to carry out it for the reentrancy issue, a programmer has to be aware of such potential problems and explicitly put assertions in a source code, that surely requires skills for secure programming.  For this project, we don't suppose that programmers have such skills, and I am going to offer a prototypical solution for them, so that they get a warning of a presence of potential reentrancy vulnerability in their code without any prerequisite secure programming knowledge.
+The topic of this project is the reentrancy vulnerability of Solidity smart contracts.  We demonstrate how to exploit a vulnerable smart contract, and we apply formal verification to detect the vulnerability.  We also practice secure programming, and apply formal verification to ensure the safety of a fixed smart contract.
 
-The rest of this document is organized as follows.  We first review what the reentrancy problem is.  There, we are going to see a running example of a vulnerable contract and an attacker contract, and a couple of security tips to prevent the problem.  Then we apply a formal verification technique due to an SMT solver Z3 to find that our contract is indeed vulnerable and also that a secure programming workaround manages the security vulnerability.  We also go through a minimal background of formal verification.
+The solidity compiler solc equips rich formal verification features.
+In order to carry it out for the reentrancy vulnerability, a programmer has to be aware of potential problems due to reentrancy and has to explicitly put assertions in a source code, that surely requires secure programming skills.  For this project, we don't suppose that programmers have such skills, and we are going to offer a prototypical solution for them, so that they get a warning of a presence of potential reentrancy vulnerability in their code without any prerequisite secure programming knowledge.  No warning means that there is no vulnerability and the smart contract is secure against the reentrancy vulnerability.
 
-The full source codes for this project is published on github.
+The rest of this document is organized as follows.  We first review what the reentrancy problem is.  There, we are going to see a running example of a vulnerable contract and an attacker contract, and a couple of security tips to prevent the problem.  Then we apply a formal verification technique due to an SMT solver Z3 by Microsoft to find that our contract is indeed vulnerable and also that a secure programming workaround gets rid of the security vulnerability.
+
+The source codes for this project are available on github.
 
 # Reentrancy
 
-The reentrancy is a cause of security problem which leads to a massive financial loss.
-As the name suggests, it exploits a function whose execution leads to another execution of itself.  Let's take a look at a running example of a vulnerable solidity code.
+The reentrancy is a cause of security problem which leads to a massive financial loss.  As the name suggests, it exploits a function whose execution leads to another execution of itself.
+We take a look at a running example of a vulnerable Solidity smart contract and an attacker contract which exploits it.  We go through secure programming tips to get rid of the vulnerability.
 
-## Vulnerable smart contract: Coin jar
+## Vulnerable smart contract: Jar
 
-The following code is a simple smart contract implementing a coin jar.
+The following Solidity code implements a coin jar.
 The expected use case is that anybody can make a deposit, and anytime in the future, the depositor can withdraw money.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
@@ -25,9 +26,7 @@ contract Jar {
 
     mapping(address=>uint) public balance;
 
-    constructor() payable {
-
-    }
+    constructor() payable {}
 
     function deposit() external payable {
         balance[msg.sender] += msg.value;
@@ -41,15 +40,26 @@ contract Jar {
     }
 }
 ```
-It has two external functions, <code>deposit</code> and <code>withdraw</code>, which are respectively to deposit crypto currency into this jar contract and to withdraw one's deposit.  The state variable <code>balance</code> records which contract address has how much deposit, and it is increased as a deposit is made via the <code>deposit</code> function.  The function <code>withdraw</code> is used to withdraw all the asset which one has deposited so far.  It first checks that the balance is non-zero, then sends the deposit to <code>msg.sender</code>, the depositor.  If the transfer is successful the balance is reset to zero.  If the balance is zero or the transfer has failed, the transaction is reverted.
+The state variable <code>balance</code> is an array of unsigned integers indexed by address.  It records which contract address has how much deposit.
+The constructor does nothing, but is <code>payable</code>, namely, this contract may receive money through the deployment.
+It has two external functions:
+- <code>deposit</code> is to deposit crypto currency into this jar contract.
+- <code>withdraw</code> is to withdraw one's deposit.
 
-This smart contract has a security problem due to the use of the <code>call</code> function.  The <code>call</code> function is to call a function of a smart contract, optionally sending native cryptocurrency.  It is commonly used to simply send native cryptocurrency, typically in the following syntax,
-```
-addr.call{ value: amount }("")
-```
-where <code>addr</code> is the destination address, <code>amount</code> is the amount to send in unsigned integer, and the nullstring (i.e. <code>""</code>) is to designate that it specifies no particular function of <code>addr</code> to call.  In order to make a particular function call, a call message in the abi format should be given instead of the nullstring (cf. https://solidity-by-example.org/call/).
+In <code>deposit</code>, the balance of the sender is increased by the amount of sent money by means of the following two objects,
+- <code>msg.sender</code> is the address who made the current function call,
+- <code>msg.value</code> is the amount of native cryptocurrency sent to the current function call.
 
-There is a problem if <code>msg.sender</code> is a smart contract.  Even if the call message is the null string, this invokes a payable function of the smart contract <code>msg.sender</code>.  The content of the payable function is in general unknown and hence we have to assume an arbitrary code is executed.
+In <code>withdraw</code>, the following functions are used:
+- <code>require(b, s)</code> checks the first argument <code>b</code> of boolean type, and if it is false, the transaction is reverted with an error where the second argument <code>s</code> of string is enclosed.
+- <code>a.call{ value: v}(m)</code> issues a call message <code>m</code> to the address <code>a</code> sending cryptocurrency which amounts to <code>v</code>.
+
+It first checks that the balance is non-zero, then sends the deposit to <code>msg.sender</code>, the depositor.  Here, the return value of <code>call</code> is unpacked and only the first element, a boolean value indicating whether the call was successful, is taken.  If the transfer is successful the balance is reset to zero.  If the balance is zero at the beginning or the transfer has failed, the transaction is reverted.
+
+The <code>call</code> function is commonly used to simply transfer cryptocurrency.  For this purpose, the empty call message, i.e. the nullstring (<code>""</code>), is specified.
+In order to make a particular function call on the other hand, a call message in the abi format should be given instead of the nullstring (cf. https://solidity-by-example.org/call/).
+
+A security problem may arise if <code>msg.sender</code> is a smart contract rather than an EOA (externally owned account).  Even if the call message is the null string, this invokes a payable function of the smart contract <code>msg.sender</code>.  The content of the payable function is in general unknown of course, and hence we have to assume an arbitrary smart contract code is executed.
 
 We are going to see that we can create a malicious contract which can steal money from the Jar contract by repeatedly calling the <code>withdraw</code> function of the Jar contract.
 
