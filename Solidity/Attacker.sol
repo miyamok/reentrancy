@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: CC-BY-4.0
-pragma solidity >=0.6.12 <0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
 import "./Jar.sol";
 
 contract Attacker {
@@ -12,7 +12,7 @@ contract Attacker {
         owner = msg.sender;
     }
 
-    function deposit() public {
+    function prepare() public {
         jar.deposit{ value: 1 ether }();
     }
 
@@ -26,7 +26,7 @@ contract Attacker {
         }
     }
 
-    function withdraw() public {
+    function get() public {
         require (msg.sender == owner);
         (bool s, ) = owner.call{ value: address(this).balance}("");
         require (s);
