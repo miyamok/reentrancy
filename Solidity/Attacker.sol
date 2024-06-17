@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: CC-BY-4.0
 pragma solidity >=0.8.0 <0.9.0;
-import "./Jar.sol";
+
+interface IJar {
+    function deposit() external payable;
+    function withdraw() external;
+}
 
 contract Attacker {
 
