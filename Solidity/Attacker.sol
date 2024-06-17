@@ -8,11 +8,11 @@ interface IJar {
 
 contract Attacker {
 
-    Jar public jar;
+    IJar public jar;
     address public owner;
 
     constructor(address _jar) payable {
-        jar = Jar(_jar);
+        jar = IJar(_jar);
         owner = msg.sender;
     }
 
