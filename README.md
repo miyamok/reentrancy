@@ -20,7 +20,7 @@ The following Solidity code implements a coin jar.
 The expected use case is that anybody can make a deposit, and anytime in the future, the depositor can withdraw money.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
-pragma solidity >=0.6.12 <0.9.0;
+pragma solidity >=0.8.0<0.9.0;
 
 contract Jar {
 
@@ -67,7 +67,7 @@ We are going to see that we can create a malicious contract which can steal mone
 The following smart contract is a successful attacker.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
-pragma solidity >=0.6.12 <0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
 
 interface IJar {
     function deposit() external payable;
@@ -84,7 +84,7 @@ contract Attacker {
         owner = msg.sender;
     }
 
-    function deposit() public {
+    function prepare() public {
         jar.deposit{ value: 1 ether }();
     }
 
@@ -98,23 +98,27 @@ contract Attacker {
         }
     }
 
-    function withdraw() public {
+    function get() public {
         require (msg.sender == owner);
         (bool s, ) = owner.call{ value: address(this).balance}("");
         require (s);
     }
 }
 ```
-<code>IJar</code> is the interface to use <code>Jar</code>.  The constructor is payable and has one argument for the address; the target Jar contract should be provided at the time of deployment.  <code>deposit</code> is the function for the <code>Attacker</code> contract to make a 1 ether deposit into the Jar contract.  <code>attack</code> is the function to start attacking the target contract.   <code>receive</code> is the default receive function which is invoked when the <code>Attacker</code> contract receives money without any payable function specified in the call message.  <code>withdraw</code> is to send all the asset of the <code>Attacker</code> contract to the deployer.
+The interface <code>IJar</code> declares the functions defined in <code>Jar</code> and used to describe the contract <code>Attacker</code>.  The constructor of <code>Attacker</code> is payable and has one argument for the address; the address of the target Jar contract should be provided at the time of deployment.  The function <code>prepare</code> is to make a 1 ETH deposit of <code>Attacker</code> into <code>Jar</code>.  The function <code>attack</code> is to attack the target <code>Jar</code> contract.   The function <code>receive</code> is a special function.  It is the default receive function which is executed when somebody sent money to <code>Attacker</code> without specifying a function to invoke.
+The function <code>get</code> is to send all the asset of <code>Attacker</code> to its deployer.
 
-An attacker deploys the <code>Attacker</code> contract, putting at least 1 ether, then steals money from the <code>Jar</code> contract in the following way.  The attacker calls <code>deposit</code> of <code>Attacker</code>; the <code>balance</code> of the <code>Jar</code> contract now keeps that the address of the contract <code>Attacker</code> has 1 ETH deposit.  Next, the attacker calls <code>attack</code>.  The execution goes to <code>withdraw</code> of <code>Jar</code>, where it first checks that the message sender, i.e. the address of the contract <code>Attacker</code> has deposited some ETH. If it is the case, the message sender is indeed a depositor.  It makes a pay-out to the depositor by means of <code>call</code>.
-In the course of <code>Attacker</code> contract's receiving money, its <code>receive</code> function is executed.  It checks that the <code>Jar</code> contract has at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw</code> of the <code>Jar</code> contract, which causes the so-called <i>reentrancy</i>.
-As the condition <code>balance[msg.sender] != 0</code> is still satisfied, the <code>Jar</code> contract again sends 1 ETH to the attacker, and it repeats until the ETH asset balance of the victim subceeds 1 ETH.
+The usage of the <code>Attacker</code> contract is as follows.
+An attacker deploys <code>Attacker</code>, providing the address of the target <code>Jar</code> and putting at least 1 ETH.  The attacker calls the function <code>prepare</code>; <code>Attacker</code> calls <code>deposit</code> of <code>Jar</code> sending 1 ETH, and hence <code>Attacker</code> has a deposit of 1 ETH in <code>Jar</code>.  Next, the attacker calls <code>attack</code>.  The execution goes to <code>withdraw</code> of <code>Jar</code>, and as the amount of <code>Attacker</code>'s deposit is 1 ETH, <code>Jar</code> proceeds to making a pay-out to <code>Attacker</code> by means of <code>call</code>.
+In the course of <code>Attacker</code>'s receiving money, its <code>receive</code> function is executed.  It checks that the asset of <code>Jar</code> amounts to at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw</code> of <code>Jar</code>, which causes the so-called <i>reentrancy</i>.
+In <code>withdraw</code> of <code>Jar</code> the condition <code>balance[msg.sender] != 0</code> is still satisfied, and therefore <code>Jar</code> again sends 1 ETH to <code>Attacker</code>.  <code>Attacker</code> stops calling <code>withdraw</code> when the amount of the asset of <code>Jar</code> subceeds 1 ETH, and the whole transaction is successfully over without a revert.
 
 ## Demonstration
 
 We demonstrate the reentrancy in an actual blockchain.
 The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia test net as well as on the remix IDE (https://remix.ethereum.org/).
+
+TODO: describe further contents.
 
 ## Secure programming to prevent reentrancy
 
@@ -136,7 +140,7 @@ The attacker contract fails to steal money, because in the first reentrancy (i.e
 The fixed Jar contract looks as follows.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
-pragma solidity >=0.6.12 <0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
 
 contract Jar {
     mapping(address=>uint) public balance;
