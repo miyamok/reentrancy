@@ -196,19 +196,21 @@ We practice formal verification through SMT solver Microsoft's Z3, and we use SM
 
 ## Formal modeling
 
-We have given formal models of Jar.sol and Jar_locked.sol within the framework of the constrained Horn clause which is the same as what the official solc compiler has employed for its built-in formal verification [[1]](#1) [[2]](#2).  The novelty of our work is that verification concerning the reentrancy vulnerability is carried out without additional assertions which have to be inserted into a source code by a programmer with security knowledges.
+We have given formal models of Jar.sol and Jar_locked.sol within the framework of the constrained Horn clause (CHC).  CHC is employed by the official solc compiler for the built-in formal verification [[1]](#1) [[2]](#2).  The novelty of our work is that verification concerning the reentrancy vulnerability is carried out without additional assertions which have to be inserted into a source code by a programmer with security knowledges.
 
-We describe how the above mentioned Jar contract are modeled in the SMTLIB2 format which SMT solvers such as Z3 accept as input.  The modeling of the contract follows existing research papers.
+We describe how the above mentioned <code>Jar</code> contract is modeled in the SMTLIB2 format which SMT solvers such as Z3 accept as input.  The modeling of the contract follows existing research papers [[2]](#2).
 
-We use following custom sorts for address, uint, and mapping(address=>uint).
+### Sorts
+
+We use the following custom sorts for address, uint, and mapping(address=>uint).
 ```
 (define-sort A () (_ BitVec 256)) ;address
 (define-sort BUINT () (_ BitVec 256)) ; bounded 256bit unsigned integer
 (define-sort M () (Array A BUINT)) ;mapping from address to Int
 ```
-Bitvector is used to represent 256 bit fixed size data, which is exactly the Solidity's uint256.
-
-we declare boolean valued functions are to model functions deposit() and withdraw() and also to model the external behavior and the states of Jar contract.
+Bitvector is used to represent 256 bit fixed size data, which is exactly uint256 of Solidity.
+### Predicate declarations
+We declare the following predicates, i.e. boolean valued functions, in Z3 to model the Solidity functions deposit() and withdraw(), the external behavior of <code>Jar</code>, and the states of <code>Jar</code>.
 ```
 (declare-fun P_alpha (M A BUINT BUINT M A BUINT BUINT Int) Bool)
 (declare-fun P_omega (M A BUINT BUINT M A BUINT BUINT Int) Bool)
@@ -223,9 +225,18 @@ we declare boolean valued functions are to model functions deposit() and withdra
 (declare-fun Jar (M BUINT) Bool)
 (declare-fun Init (M BUINT) Bool)
 ```
-<code>deposit</code> is modeled by P_alpha, P_omega, and S.
-We take each function execution as step by step state transitions.
-For this deposit(), 2 such states suffice, and hence we have two functions P_alpha and P_omega, respectively.  On the other hand, S is to model state updates due to executing deposit().  In principle, it determines whether there was a revert or not, and if so, it restores the original states to cancel the transaction, and otherwise, it updates the states.  Here we show the Horn clauses for P_alpha and P_omega.
+### Modeling `deposit`
+<code>deposit</code> is modeled by `P_alpha`, `P_omega`, and `S`.
+We represent the program execution as step by step state transitions.
+The function body of `deposit` consists of one line, and it is representable as one step execution, hence it suffices to have two states to present a transition system.
+```
+    function deposit() public payable {
+        balance[msg.sender] += msg.value;
+    }
+```
+The two functions `P_alpha` and `P_omega` stands for the state before the line and the state after the line, respectively.  On the other hand, `S` is to model state updates due to running throughout `deposit` and stands for summary.  In principle, it determines whether there was a revert during the function execution, and if so, it restores the original states to cancel the transaction, and otherwise, it updates the states.  Here we show the Horn clauses for `P_alpha`, `P_omega`, and `S` in SMTLIB2.
+
+TODO: maybe, clarifying the distinction between constrained Horn clause and Horn clause.
 ```
 (assert
  (forall ((b M) (l_b M) (s A) (l_s A) (v BUINT) (l_v BUINT) (l_r Int)
@@ -252,15 +263,15 @@ For this deposit(), 2 such states suffice, and hence we have two functions P_alp
 		  (= r l_r))
 	     (S b tb s v b^ tb^ r))))
 ```
-Let's see what the arguments of P_alpha and P_omega are.  b models the state variable balance of type mapping(address=>uint), s models the address of the sender, v models a value sent from the sender to this contract for the call to deposit(), and tb models the balance of the native cryptocurrency owned by this contract (standing for this.balance).
-The original values of these variables b, s, v, and tb will be updated in the summary S only when the function call is over without reverting.  The variables with the prefix l_ are used for temporal memory for changes throughout an execution, and used to update states or discarded in case of a revert.  P_alpha is in charge of initialization.  l_b, l_s, l_v, and l_tb are initialized by the corresponding values in P_alpha.  Note that deposit() is a payable function and the balance of this contract is increased by msg.value, that is modeled by the equational constraints on tb etc. where overflow is also handled properly.  Here, bvadd is a function for addition of bitvectors, and bvule is the less than relation taking bitvectors as unsigned integers.
-l_r is a temporal memory for the revert status, which is set to 0 (no error) in P_alpha.
-The function deposit() consists of just one line.  After executing this line, we have a transition from P_alpha to P_omega.  The equational constraint comes straightforwardly to describe the state after the execution.  Here we use arithmetic for arrays, that involves operations select and store.  select takes two arguments, an array and an index, and returns a value at the index.  store takes three arguments, an array, an index, and a value, and returns a new array where the value at the index has been updated to be the given value.
-The balance (a shared variable, not the native crypto of the contract) of the sender is increased by the sent value from a caller.  Note that overflow is handled as well.
-S is to check whether the function execution reached its end, P_omega, with any revert or not, and in case there is a revert, i.e. l_r is non-zero, it restores the original states, and otherwise, it updates states by l_ prefixed-variables.
-The arguments b^ and bt^ are in charge of the states when the execution is over.
-
-Let's move on to the model of withdraw().
+Let's see what the arguments of `P_alpha` and `P_omega` are.  `b` models the Solidity state variable `balance` of type `mapping(address=>uint)`, `s` models `msg.sender`, the address of the sender, `v` models `msg.value`, the amount of the native cryptocurrency sent from the sender to this contract for the call to `deposit`, and `tb` models `this.balance`, the balance of the native cryptocurrency this contract owns.
+The original values of these variables `b`, `s`, `v`, and `tb` will be updated by the summary `S` only if the function call is over without a revert.  The variables with the prefix `l_` (standing for local) are to record intermediate changes, and are used to update states if there is no revert, and are discarded in case of a revert.  `P_alpha` is in charge of initialization.  There, `l_b`, `l_s`, `l_v`, and `l_tb` are initialized by the corresponding values.  Note that `deposit` is a payable function and the balance of this contract is increased by `msg.value`, that is modeled by the equational constraints on `tb` etc., where overflow is also handled properly.  Here, `bvadd` is a function for addition of bitvectors, and `bvule` is the less than relation taking bitvectors as unsigned integers.
+`l_r` keeps the intermediate revert status, which is initialized as 0 (no error).
+The function body of `deposit` consists of just one line.  An execution of this line makes a transition from `P_alpha` to `P_omega`.  The equational constraint comes straightforwardly to describe the state after the execution.  Here we use arithmetic for arrays, that involves operations `select` and `store`.  `select` takes two arguments, an array and an index, and returns a value at the index.  `store` takes three arguments, an array, an index, and a value, and returns a new array where the value at the index has been updated to be the given value.
+The Solidity shared variable `balance` is increased by the sent value from a caller.  Note that overflow is handled as well.
+`S` is to check whether the function execution reached its end, `P_omega`, with any revert or not, and in case there is a revert, i.e. `l_r` is non-zero, it restores the original states to cancel the transaction, and otherwise, it updates states by `l_` prefixed-variables.
+The arguments `b^` and `bt^` are in charge of the states when the execution is over.
+### Modeling `withdraw` and the external behavior of `Jar`
+Let's move on to the model of `withdraw`.
 ```
 (assert
  (forall ((b M) (l_b M) (s A) (l_s A) (v BUINT) (l_v BUINT) (l_r Int)
@@ -343,7 +354,7 @@ Now we are able to discuss the Horn clause of Q_3 (same as above)
 	     (Q_3 b s v tb l_b^ l_s l_v l_tb^ l_r))))
 ```
 This models that l_b and l_tb came from Q_2 goes to any l_b^ and l_tb^ satisfying Ext l_b l_tb l_b^ l_tb^, that means the state of l_b and l_tb goes to another state of l_b^ and l_tb^ due to a sequence of transitions.
-
+### Modeling the smart contract `Jar`
 Considering the lifetime of the contract, it has the initial state and the state changes through transactions.  This is modeled by Init and Jar as follows, assuming zeros is an empty mapping (all values are zero).  tb is arbitrary and represents that it may receive any amount of native asset through the deployment, as the constructor is payable.  Jar represents the contract's state, which is modeled as a tree whose root is of the initial state, and branches are formed due to one step transition without a revert.
 ```
 (assert (forall ((tb BUINT)) (Init zeros tb)))
@@ -365,6 +376,7 @@ Considering the lifetime of the contract, it has the initial state and the state
 		  (= r 0))
 	     (Jar b^ tb^))))
 ```
+### Modeling the security property
 We have formalized the smart contract.  We are at the last step, that is to model the security property to detect the reentrancy vulnerability.
 <!-- 
 Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
