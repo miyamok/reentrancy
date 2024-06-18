@@ -180,18 +180,18 @@ Instead of putting zero for the balance, it subtracts the amount of transfer, wh
 
 # Formal verification
 
-As a case study, we apply formal verification in order to detect the reentrancy vulnerability of the jar contract.  We manually formalized a model of the jar contract, and use it to find a possible reentrancy which causes an unexpected change of persistent data, such as state variables of the contract and its asset balance of the native cryptocurrency.  The safety property to check is that any change of persistent data is deterministic, namely, the execution results are independent from unknown external contracts.  In case the security property is violated, we get an evidence showing how it happens.
+We apply formal verification in order to detect the reentrancy vulnerability of the vulnerable jar contract and also to ensure the safety of a secure jar contract thanks to a lock object.  We manually formalized a model of the contracts, and use it to find a possible reentrancy which causes an unexpected change of persistent data, such as state variables of the contract and its asset balance of the native cryptocurrency.  The safety property to check is that any change of persistent data is deterministic, namely, the execution results are independent from unknown external contracts.  In case the security property is violated, we get an evidence showing how it happens.
 
-The solc compiler has rich features for formal verifications.   In order to detect a reentrancy vulnerability, making use of these solc features, it requires a programmer to put additional assertions properly, which has to be based on security knowledges.
-Our case study of formal verification indeed works to the above shown vulnerable smart contract without an additional assertions, namely, a programmer is required to know about security, neither.
+The solc compiler has rich features for formal verifications.   In order to detect a reentrancy vulnerability by means of these solc features, a programmer has to put additional assertions properly, which has to be based on security knowledges.
+Our case study of formal verification indeed works to the above shown vulnerable smart contract without an additional assertions.  Needless to say, a programmer is not required to know about security, either.
 Currently (as of June 2024) solc doesn't offer a feature automatically to detect reentrancy vulnerability without explicit assertions in source code.
 
-We practice formal verification by means of SMT solver Microsoft's Z3, and we use SMTLIB2 for SMT modeling.  The following codes are used.
+We practice formal verification through SMT solver Microsoft's Z3, and we use SMTLIB2 for SMT modeling.  The following codes are used.
 
 - Solidity code of the vulnerable smart contract ([Jar.sol](Solidity/Jar.sol))
 - Solidity code of the attacker smart contract ([Attacker.sol](Solidity/Attacker.sol))
 - SMTLIB2 model of the vulnerable smart contract and the security property ([jar.smt](smt/jar.smt))
-- Solidity code of the secure smart contract ([Jar_locked.sol](Solidity/Jar_locked.sol))
+- Solidity code of the secure smart contract due to lock ([Jar_locked.sol](Solidity/Jar_locked.sol))
 - SMTLIB2 model of the secure smart contract and the security property ([jar_locked.smt](smt/jar_locked.smt))
 
 ## Formal modeling
