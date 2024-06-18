@@ -356,7 +356,7 @@ Now we are able to discuss the Horn clause of `Q_3` (same as above)
 ```
 This models that `l_b` and `l_tb` came from `Q_2` goes to any `l_b^` and `l_tb^` satisfying `Ext l_b l_tb l_b^ l_tb^`, that means the state of `l_b` and `l_tb` goes to another state of `l_b^` and `l_tb^` due to a transition due to an external behavior.
 ### Modeling the smart contract `Jar`
-Considering the lifetime of the contract, it has the initial state and the state changes through transactions.  This is modeled by Init and Jar as follows, assuming zeros is an empty mapping (all values are zero).  tb is arbitrary and represents that it may receive any amount of native asset through the deployment, as the constructor is payable.  Jar represents the contract's state, which is modeled as a tree whose root is of the initial state, and branches are formed due to one step transition without a revert.
+Considering the lifetime of smart contracts, it has the initial state and states reachable from the initial one through transactions.  This is modeled by Init and Jar as follows, assuming `zeros` is an empty mapping (all values are zero).  `tb` is arbitrary and represents that it may receive any amount of native asset through the deployment, as the constructor of `Jar` is payable.  `Jar` represents the contract's state, which is understood as a tree whose root is of the initial state, and branches are formed due to one step transition without a revert.
 ```
 (assert (forall ((tb BUINT)) (Init zeros tb)))
 
@@ -378,31 +378,30 @@ Considering the lifetime of the contract, it has the initial state and the state
 	     (Jar b^ tb^))))
 ```
 ### Modeling the security property
-We have formalized the smart contract.  We are at the last step, that is to model the security property to detect the reentrancy vulnerability.
-<!-- 
-Based on the above observation, our static program analyzer should issue a warning on a potential vulnerability due to the reentrancy attack, when there is a function which makes a money transfer such as:
-
-1. Preconditions of the money transfer may be satisfied in a recursive call.
-2. After carrying out the repeated money transfer, the transaction may successfully complete. -->
+The smart contract `Jar` has been formally modeled.
+We are at the last step to model the security property as follows.
 ```
 (assert
  (forall ((b M) (tb BUINT) (s A) (v BUINT)
- 	  (b^ M) (tb^ BUINT) (r^ Int) (r_^ Int)
-	  (b_^ M) (tb_^ BUINT))
-  	  (not (and (Jar b tb)
-		    (T b tb s v b^ tb^ r^)
-		    (T b tb s v b_^ tb_^ r_^)
-		    (= r^ 0)
-		    (= r_^ 0)
-		    (not (and (= b^ b_^) (= tb^ tb_^)))))))
+ 		  (b^ M) (tb^ BUINT) (r^ Int)
+		  (r_^ Int) (b_^ M) (tb_^ BUINT))
+  		 (not (and (Jar b tb)
+		      (T b tb s v b^ tb^ r^)
+		      (T b tb s v b_^ tb_^ r_^)
+		      (= r^ 0)
+		      (= r_^ 0)
+		      (not (and (= b^ b_^)
+			            (= tb^ tb_^)))))))
 ```
-This models that the result of a call to withdraw() is deterministic.  In case this property is violated, the SMT solver answers unsat and gives a proof log showing that there are two distinct results although the function call has started from the identical situation, the state (b, tb), by the caller s, the amount of sent native currency v, and has ended without a revert.
+This Horn clause represents the property that result of a call to `withdraw` is deterministic. 
+In case this property is violated, a call to `withdraw` yields different results depending on an unknown external contracts.  The SMT solver answers `unsat` and gives a proof log which witnesses two distinct results which can be yielded by a function call.
 
-This security property is not very optimal in the sense that it causes false positive in the detection of the reentrancy vulnerability.  For example, it is better to make use of an invariance concerning the balances.  However, we employ the above mentioned assertion due to the following reasons.
+Our security property is not very optimal in the sense that it causes false positive in the detection of the reentrancy vulnerability, as one call to `deposit` on one hand and nothing to call on the other hand can violate the property.  It is better to make use of an invariance concerning the balances, and specify for example that the difference between the total amount of deposits and the amount of native asset of the contract is constant.  However, for the moment, we employ the above mentioned assertion due to the following reasons, and consider some variations of the model, such as only `withdraw` is allowed for an external call from an unknown contract, in order to find a vulnerability result.
 
-- Generation of an invariance is not straightforward in a general case.  We prefer to leave it for future work
-- We have faced a limit of computational power of the machine in case the assertion makes use of an invariance (still non-terminating in half a day of Z3 execution).  We should keep the problem manageable in seconds.
+- Automatic generation of an invariance is not straightforward in a general case.
+- We have faced a limit of computational power of the machine in case the above mentioned use of the invariance was employed (still non-terminating in half a day of Z3 execution).  We prefer to keep the problem manageable in seconds, and we need an optimization to overcome this issue.
 
+We leave them for future work
 ## Experiment
 
 We are going to see how to practice formal verification by means of the SMT solver Z3.  In case we get a satisfiability result, the contract is secure.  If the model in conjunction with the security property is unsatisfiable, Z3 provides a proof which is an evidence of the violation of the security property.  At the end, we managed to get an evidence showing that our jar contract causes a financial loss due to the reentrancy vulnerability as follows:
