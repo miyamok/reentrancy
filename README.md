@@ -11,7 +11,9 @@ The source codes for this project are available on github.
 
 # Reentrancy
 
-The reentrancy is a cause of security problem which leads to a massive financial loss.  As the name suggests, it exploits a function whose execution leads to another execution of itself.
+The reentrancy is a programming concept where a function call causes another function call to itself before the original function call ends.
+In the context of smart contracts, a function which allows reentrancy can be a cause of security problem.  The reentrancy vulnerability of an Ethereum DAO has lead to a massive financial loss of $150M in 2016.
+
 We take a look at a running example of a vulnerable Solidity smart contract and an attacker contract which exploits it.  We go through secure programming tips to get rid of the vulnerability.
 
 ## Vulnerable smart contract: Jar
