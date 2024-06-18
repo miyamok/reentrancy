@@ -271,7 +271,8 @@ The Solidity shared variable `balance` is increased by the sent value from a cal
 `S` is to check whether the function execution reached its end, `P_omega`, with any revert or not, and in case there is a revert, i.e. `l_r` is non-zero, it restores the original states to cancel the transaction, and otherwise, it updates states by `l_` prefixed-variables.
 The arguments `b^` and `bt^` are in charge of the states when the execution is over.
 ### Modeling `withdraw` and the external behavior of `Jar`
-Let's move on to the model of `withdraw`.
+Let's move on to the model of `withdraw` which relies on the notion of external behavior of the contract `Jar`.  The external behavior is the key notion to model how an unknown smart exploits the vulnerability of `Jar`.
+We model `withdraw` as follows.
 ```
 (assert
  (forall ((b M) (l_b M) (s A) (l_s A) (v BUINT) (l_v BUINT) (l_r Int)
@@ -320,9 +321,9 @@ Let's move on to the model of `withdraw`.
 		  (= r l_r))
 	     (T b tb s v b^ tb^ r))))
 ```
-Q_alpha is for the initial step.  Q_1 comes after the condition <code>balance[msg.sender] != 0</code> is true.  We model the next line of call() as two steps, where the first one is to send the native currency by Q_2 and the second is to process the call value by Q_3.  For simplicity we assume that the call() is always successful.  It is harmless to do so because in case call() is not successful, it is reverted by require().  Note that we should explicitly handle a revert if assert() was used here instead of require().  Q_omega comes after the last line <code>balance[msg.sender] = 0;</code>.  T is a summary for withdraw().
+`Q_alpha` is for the initial step.  `Q_1` is derived if the condition <code>balance[msg.sender] != 0</code> holds.  We model the next line of `call`, splitting it into two steps, where the first step `Q_2` is to send the native currency to `msg.sender` and the second one `Q_3` is to process the call message.  For simplicity we consider only the case that `call` is always successful.  This simplification is harmless because in case `call` is not successful, it is reverted by `require`, and it doesn't affect the safety property.  Note that we should explicitly handle a revert if `assert` was used here instead of `require` in the Solidity code.  `Q_omega` comes after the last line to set zero for `balance[msg.sender]`.  `T` is a summary predicate for `withdraw`.
 
-There are two new things, one of which is just a new function bvsub for the subtraction in bitvectors.  The other new thing is a model of an external behavior of the jar contract, that is crucial to handle a call to an unknown external contract, which is for this case a contract of the address msg.sender.
+There are two new elements, one is a new function `bvsub` for the subtraction in bitvectors.  The other is a predicate `Ext` which models an external behavior of `Jar`.
 ```
 (assert (forall ((b M) (tb BUINT)) (Ext b tb b tb)))
 
@@ -340,9 +341,9 @@ There are two new things, one of which is just a new function bvsub for the subt
 			 (= r 0))
 		    (Ext b tb b^^ tb^^))))
 ```
-In general, an unknown external function can make arbitrary several calls to the public functions of the jar contract.  The idea is to model such a sequence of transitions through an external behavior of the jar contract.  For the jar contract, Ext is defined as a boolean valued function which takes four arguments.  The first two represents a state which consists of b and tb, i.e. the public state variable balance and the amount of native crypto-asset of the jar contract.  In principle, we should enumerate all publicly available data of the contract relevant to the formal analysis.  The other two arguments represent a possible future state as a result of a sequence of transitions, which consists of function calls to deposit() and withdraw().
+An unknown external function is arbitrary in general, and it can involve calls to the public or external functions of any other contracts including `Jar`.  The idea is to abstractly model how such an unkonwn function affects <code>Jar</code>.  `Ext` is defined as a boolean valued function which takes four arguments.  The first two represents a state which consists of `b` and `tb`, i.e. the state variable `balance` and the amount of the native asset, `this.balance`, of <code>Jar</code>.  In principle, here we should list all publicly available data of the contract relevant to the formal analysis.  The other two arguments represent a possible future state of `Jar` as a result of executing an unknown function, which may involve function calls to `deposit` and `withdraw`.  The above three Horn clauses represent the case where no external behavior changing the states and the cases where `deposit` and `withdraw` caused external behaviors, respectively.
 
-Now we are able to discuss the Horn clause of Q_3 (same as above)
+Now we are able to discuss the Horn clause of `Q_3` (same as above)
 ```
 (assert
  (forall ((b M) (l_b M) (l_b^ M) (s A) (l_s A) (v BUINT) (l_v BUINT) (l_r Int)
@@ -353,7 +354,7 @@ Now we are able to discuss the Horn clause of Q_3 (same as above)
 		       (= tb^ l_tb) (= tb^^ l_tb^)))
 	     (Q_3 b s v tb l_b^ l_s l_v l_tb^ l_r))))
 ```
-This models that l_b and l_tb came from Q_2 goes to any l_b^ and l_tb^ satisfying Ext l_b l_tb l_b^ l_tb^, that means the state of l_b and l_tb goes to another state of l_b^ and l_tb^ due to a sequence of transitions.
+This models that `l_b` and `l_tb` came from `Q_2` goes to any `l_b^` and `l_tb^` satisfying `Ext l_b l_tb l_b^ l_tb^`, that means the state of `l_b` and `l_tb` goes to another state of `l_b^` and `l_tb^` due to a transition due to an external behavior.
 ### Modeling the smart contract `Jar`
 Considering the lifetime of the contract, it has the initial state and the state changes through transactions.  This is modeled by Init and Jar as follows, assuming zeros is an empty mapping (all values are zero).  tb is arbitrary and represents that it may receive any amount of native asset through the deployment, as the constructor is payable.  Jar represents the contract's state, which is modeled as a tree whose root is of the initial state, and branches are formed due to one step transition without a revert.
 ```
