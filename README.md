@@ -123,21 +123,17 @@ TODO: describe further contents.
 ## Secure programming to prevent reentrancy
 
 We discuss a couple of workarounds to prevent the above mentioned problem.
-Let's review how the <code>Attacker</code> contract and the <code>Jar</code> contract interact.
-The prerequisite to make a transfer is that the balance <code>balance[msg.sender]</code> is positive when <code>withdraw</code> of <code>Jar</code> is called.  There, the balance is set to be 0 after the actual money transfer has been done, hence the prerequisite is satisfied in case of a reentrancy as well.  The attacker stops the process when the amount of the asset of <code>Jar</code> got few.  It makes the whole transaction successful without causing a revert.
-
-A commonly suggested cure for the vulnerability is to make use of mutex to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.
+A commonly suggested cure for the vulnerability is to make use of a lock to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.
 
 ### Lock
 
-A common solution is to use a lock object, which creates a critical region in the source code to prevent the unexpected execution through reentrancy.
-Typically a lock object is a state variable of integer or boolean type.  Using boolean, it becomes true before it enters a critical region and false after the region, and in case it is already true before the critical region, the execution cannot enter the region.  A use of integer allows more flexibility by specifying the maximal number more than one for reentrancy, rather than exactly one in case of boolean.
+A lock object creates a critical region in the source code to prevent an unexpected reentrancy.  A lock object is implemented via a boolean.  Before entering a critical region, it checks the lock.  If the lock is false, it indicates that the critical region is not locked, and one may enter the region, switching the lock to true.  After getting out of the region, the lock is reset to false.  As long as the lock is true, it is not allowed to newly enter the critical region.
 In the <code>Jar</code> contract, the line of <code>msg.sender.call</code> should be a crucial part of the critical region.
 An easy way of implementing it is to use <code>ReentranceGuard</code> of openzeppelin (https://github.com/binodnp/openzeppelin-solidity/blob/master/docs/ReentrancyGuard.md).
-They provide a modifier <code>nonReentrant</code> which should be applied to a function.  In our example, the <code>withdraw</code> function is a right candidate to get this modifier, so that the whole content, surely including the above mentioned critical line, is under the control of the lock object.
-The attacker contract fails to steal money, because in the first reentrancy (i.e. the secondary call of <code>withdraw</code>), the reentrancy is detected and the whole transaction is reverted.
+They provide a modifier <code>nonReentrant</code> which should be applied to a function.  In our example, <code>withdraw</code> should get this modifier, so that the whole content, surely including the above mentioned critical line, is under the control of the lock object.
+<code>Attacker</code> fails to steal money, because in the first reentrancy (i.e. the second time call of <code>withdraw</code>), the reentrancy is detected and the whole transaction is reverted.
 
-The fixed Jar contract looks as follows.
+The fixed <code>Jar</code> contract looks as follows.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
 pragma solidity >=0.8.0 <0.9.0;
@@ -164,14 +160,11 @@ contract Jar {
 ```
 ### Updating the critical value before transfer
 
-Another solution particularly applicable to our case is to set zero for <code>balance</code> immediately after checking the non-zero and before the transfer.
-By this improvement, the attacker fails because the balance of the attacker is already zero and reentrancy doesn't make the second transfer.
+Another solution particularly applicable to our case is to set zero for <code>balance[msg.sender]</code> immediately after checking the non-zero and before the transfer.  By this change, the deposit of the attacker is already zero in the reentrancy call, and hence the whole transaction is reverted.
 
 ### Underflow
 
-Although this option is not a practically recommendable workaround, at least in my personal opinion, I would like to mention it because it explains the importance of recent change of the solidity language to cause revert in case of arithmetical failures such as underflow, and also how attacker's attempt is foiled by a revert.
-
-Consider the following version of <code>withdraw</code>.
+In Solidity version 0.8 and above, arithmetic operations revert on underflow.  Consider the following version of <code>withdraw</code>.
 ```
 function withdraw() public {
     uint amount = balance[msg.sender];
@@ -181,7 +174,7 @@ function withdraw() public {
     balance[msg.sender] -= amount;
 }
 ```
-Instead of putting zero for the balance, it subtracts the amount of transfer, where <code>amount</code> is defined at the very beginning.  After <code>Attacker</code> stopped withdrawal, the repeated subtraction causes an arithmetical underflow, because <code>balance[msg.sender]</code> is of type unsigned integer, and the whole transaction is reverted.  As a result, all unexpected transfers are canceled and the contract is secure against <code>Attacker</code>.
+Instead of putting zero for the balance, it subtracts the amount of transfer, where <code>amount</code> is defined at the very beginning.  After <code>Attacker</code> stopped withdrawal, the repeated subtraction causes an arithmetical underflow, because <code>balance[msg.sender]</code> is of type unsigned integer.  In case of reentrancy, the whole transaction is reverted, and the contract is secure against <code>Attacker</code>.
 
 # Formal verification
 
