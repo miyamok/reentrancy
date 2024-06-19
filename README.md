@@ -383,15 +383,15 @@ We are at the last step to model the security property as follows.
 ```
 (assert
  (forall ((b M) (tb BUINT) (s A) (v BUINT)
-		  (b^ M) (tb^ BUINT) (r^ Int)
-		  (r_^ Int) (b_^ M) (tb_^ BUINT))
-		 (not (and (Jar b tb)
-		      (T b tb s v b^ tb^ r^)
-		      (T b tb s v b_^ tb_^ r_^)
-		      (= r^ 0)
-		      (= r_^ 0)
-		      (not (and (= b^ b_^)
-			            (= tb^ tb_^)))))))
+          (b^ M) (tb^ BUINT) (r^ Int)
+          (r_^ Int) (b_^ M) (tb_^ BUINT))
+         (not (and (Jar b tb)
+              (T b tb s v b^ tb^ r^)
+              (T b tb s v b_^ tb_^ r_^)
+              (= r^ 0)
+              (= r_^ 0)
+              (not (and (= b^ b_^)
+                   (= tb^ tb_^)))))))
 ```
 This Horn clause represents the property that result of a call to `withdraw` is deterministic. 
 In case this property is violated, a call to `withdraw` yields different results depending on an unknown external contracts.  The SMT solver answers `unsat` and gives a proof log which witnesses two distinct results which can be yielded by a function call.
