@@ -383,9 +383,9 @@ We are at the last step to model the security property as follows.
 ```
 (assert
  (forall ((b M) (tb BUINT) (s A) (v BUINT)
- 		  (b^ M) (tb^ BUINT) (r^ Int)
+		  (b^ M) (tb^ BUINT) (r^ Int)
 		  (r_^ Int) (b_^ M) (tb_^ BUINT))
-  		 (not (and (Jar b tb)
+		 (not (and (Jar b tb)
 		      (T b tb s v b^ tb^ r^)
 		      (T b tb s v b_^ tb_^ r_^)
 		      (= r^ 0)
