@@ -401,28 +401,27 @@ Our security property is not very optimal in the sense that it causes false posi
 - Automatic generation of an invariance is not straightforward in a general case.
 - We have faced a limit of computational power of the machine in case the above mentioned use of the invariance was employed (still non-terminating in half a day of Z3 execution).  We prefer to keep the problem manageable in seconds, and we need an optimization to overcome this issue.
 
-We leave them for future work
+We leave them for future work.
 ## Experiment
 
-We are going to see how to practice formal verification by means of the SMT solver Z3.  In case we get a satisfiability result, the contract is secure.  If the model in conjunction with the security property is unsatisfiable, Z3 provides a proof which is an evidence of the violation of the security property.  At the end, we managed to get an evidence showing that our jar contract causes a financial loss due to the reentrancy vulnerability as follows:
+We are going to see how to practice formal verification by means of the SMT solver Z3.  Z3 is particularly advantageous for our verification work thanks to its integration with another software Spacer which is specialized for Horn clause solving.  If the model in conjunction with the security property is satisfiable, the contract is secure.  If it is unsatisfiable, Z3/Spacer provides a proof which witnesses the violation of the security property.  At the end, we read off an evidence showing that our jar contract causes a financial loss due to the reentrancy vulnerability as follows:
 
-- Assume the contract has the state ([1], 3), meaning that an account (say the account 0) has its deposit which amounts to 1 and the asset balance of the jar contract amounts to 3.
-- Distinct transactions may happen when the account 0 calls withdraw():
-    - the state of the contract ends up with ([0], 1)
-    - the state of the contract ends up with ([0], 2)
-- Although withdraw() is supposed to pay back to the caller the exact amount of the deposit, that is 1, the contract may pay back 2.
-- This divergence comes from two distinct external behaviors, to ([0], 1) and to ([1], 2) from the state ([1], 2), are possible through a call to <code>msg.sender.call()</code> in <code>withdraw()</code>.
+- Assume the contract has the state `([1], 3)`, where the singleton array `[1]` means that the account of index 0 has its deposit which amounts to 1 and `3` means that the jar contract's asset amounts to 3.
+- Distinct transactions may happen when the account of the index 0 calls `withdraw`:
+    - the state of the contract ends up with `([0], 1)`
+    - the state of the contract ends up with `([0], 2)`
+- Although `withdraw` is supposed to pay back to the caller the exact amount of the deposit, that is 1, the contract may pay back 2.
+- This divergence comes through a call to <code>msg.sender.call</code> in <code>withdraw</code>.
 
-<!-- We will discuss the details of -->
-It requires some optimization and modification of the model, in order to get an interesting vulnerability scenario, for instance, deactivating a Horn clause describing the external behavior of Jar due to the <code>deposit</code> function which is indeed innocent.
-Executing Z3 for the model and the security property mentioned above, I didn't get an answer from Z3 in a reasonable time consumption (after half a day, I gave up).
+It required some modification of the model, in order to get the above vulnerability scenario, for instance, deactivating a Horn clause describing the external behavior of Jar due to the <code>deposit</code> function which is indeed innocent.
+Executing Z3 for the model and the security property mentioned in the previous sections without a modification, we didn't get an answer from Z3 in a reasonable time consumption (after half a day, we gave up).
 The following version of the definition of Init enabled me to get an answer in a few seconds.
 ```
 (assert (forall ((b M) (tb BUINT)) (=> (Init b tb) (Jar b tb))))
 ```
-Contrary to the source code, this new model allows any balance at the deployment.  Although the initial balance should be all zero, and updates of the balance should be done by the functions deposit() and withdraw(), it seems computationally too demanding and not practicable.  This modification is benign to our purpose, and we accept it for this moment to get a result.
+Contrary to the source code, this new model allows any balance at the deployment.  Although the balance should be all zero at the moment of deployment, and updates of the balance should be done by the functions `deposit` and `withdraw`, Z3/Spacer could not manage the task to figure out a suitable state of the contract and transitions to it.
 
-Another modification was limiting the size of the array, balance, and the maximal number for the uint to small numbers.  This means that we assume the number of users is small and also assume our system allows only small numbers for representing the amount of asset.  It is also benign for our purpose, that is, to detect the vulnerability.
+Another modification was limiting the size of the array, balance, and the maximal number for the uint to small numbers.  This means that for the proof search we assume the number of users is small and also assume our system allows only small numbers for representing the amount of asset.
 In order to let the size of the balance array small, we give a custom definition for A, the data sort for the accounts.  For example, the following unit sort, namely, a singleton sort,
 ```
 (declare-datatypes () ((Unit unit)))
@@ -430,9 +429,6 @@ In order to let the size of the balance array small, we give a custom definition
 ```
 is used to represent the case there is only one account holder in our system.
 For the asset, we used the bitvector of length 2 representing numbers {0, 1, 2, 3}.
-
-<!-- The Horn clauses concerning the predicate <code>Ext</code> are in charge of describing the external behavior of the Jar contract.  It's not always the case that we need to make use of all of them, in order to get an unsatisfiability result, i.e. the contract is not secure.  We may use a proper subset of those Horn clauses to get an optimal unsatisfiability proof.  In fact, we deactivate the Horn clause corresponding to <code>deposit</code>, and get an unsatisfiability proof illustrating the case causing a financial loss.  Needless to say, we need to activate all Horn clauses to show the satisfiability result. -->
-
 
 ## Unsatisfiability proof
 
@@ -554,13 +550,18 @@ TODO: automatically generate a model and a security property for a given source 
 
 ## Future work
 
-We can think about a security property which makes use of an invariance.
-For example, the difference between the amount of the asset of the Jar contract and the total sum of the deposit is constant, as long as we have calls to <code>deposit</code> and <code>withdraw</code>.
-Although such an invariance is very useful to write down an optimal security property, we did not use it because Z3 could not manage the SAT solving in a reasonable time frame (we gave up after half a day running).
-As a future work, we will try other SMT solvers and theorem provers to overcome this issue.  We already tried the SMT solver cvc5, but it did not show any better performance over Z3 for our particular problem.
-In order for fully automatic verification, an extraction of invariance is necessary.
-We used a modified model to let Z3 finish the task in a reasonable time frame. Concretely speaking, the state variable <code>balance</code> of type <code>mapping(address=>uint)</code> was modeled by an array of the length 1.  Although it is apparent that the obtained violation result of the security property does violate the security property in the unmodified model for our particular case, a soundness result of such model abstraction in general should be useful.
-Concerning implementation, solc has already had features to generate CHC models from Solidity source codes.  Ideally, our future implementation work should be integrated with solc.
+Our future work can be split into two kinds.  The one is about the performance of automated reasoning, and the second is about the optimality, generality, and automated extraction of the security property.  
+
+An improvement for the performance of automated reasoning is crucial, because it indeed prevented us from us employing a proper security propery and as a result we had to accept ad-hoc modifications to the security property.  Due to the same reason, it is also not possible to make use of an invariance, described below, at the moment.
+One common strategy is to use several tools in parallel and make use of available results.  We will follow it and try other SMT solvers and theorem provers to overcome this issue.
+We already tried the SMT solver cvc5, but it did not show a better performance over Z3/Spacer for our particular problem.
+
+In order for fully automatic verification, an extraction procedure of the security property is necessary.  The ad-hoc modifications we had to give in the previous sections should be gone, although in order to get a witness of the security violation through an unsatisfiability proof, a specialized model still yields a sound result.
+A more optimal description of the security property is available by means of an invariance.  For example, the difference between the amount of the asset of the Jar contract and the total sum of the deposits is constant, as long as we have calls to <code>deposit</code> and <code>withdraw</code>.
+
+<!-- We used a modified model to let Z3 finish the task in a reasonable time frame. Concretely speaking, the state variable <code>balance</code> of type <code>mapping(address=>uint)</code> was modeled by an array of the length 1.  Although it is apparent that the obtained violation result of the security property does violate the security property in the unmodified model for our particular case, a soundness result of such model abstraction in general should be useful. -->
+
+The implementation of the official Solidity compiler solc has already had features to generate CHC models from Solidity source codes.  Ideally, our future implementation work should be integrated with solc.
 
 ## External links
 
