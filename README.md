@@ -1,11 +1,11 @@
 # Reentrancy vulnerability of smart contracts
 
-The topic of this project is the reentrancy vulnerability of Solidity smart contracts.  We demonstrate how to exploit a vulnerable smart contract, and we apply formal verification to detect the vulnerability.  We also practice secure programming, and apply formal verification to ensure the safety of a fixed smart contract.
+The topic of this project is the reentrancy vulnerability of Solidity smart contracts.  We create a vulnerable smart contract, demonstrate how to exploit it, and apply formal verification to detect the vulnerability.  We also practice secure programming, and apply formal verification to ensure the safety of a fixed smart contract.
 
 The solidity compiler solc equips rich formal verification features.
 In order to carry it out for the reentrancy vulnerability, a programmer has to be aware of potential problems due to reentrancy and has to explicitly put assertions in a source code, that surely requires secure programming skills.  For this project, we don't suppose that programmers have such skills, and we are going to offer a prototypical solution for them, so that they get a warning of a presence of potential reentrancy vulnerability in their code without any prerequisite secure programming knowledge.  No warning means that there is no vulnerability and the smart contract is secure against the reentrancy vulnerability.
 
-The rest of this document is organized as follows.  We first review what the reentrancy problem is.  There, we are going to see a running example of a vulnerable contract and an attacker contract, and a couple of security tips to prevent the problem.  Then we apply a formal verification technique due to an SMT solver Z3 by Microsoft to find that our contract is indeed vulnerable and also that a secure programming workaround gets rid of the security vulnerability.
+The rest of this document is organized as follows.  We first review what the reentrancy problem is.  There, we are going to see a running example of a vulnerable contract and an attacker contract, and a couple of security tips to prevent the problem.  Then we apply a formal verification technique due to an SMT solver Z3 by Microsoft to find that our contract is indeed vulnerable.  An automatically generated unsatisfiability proof due to Z3 contains a witness of the reentrancy vulnerability, which concretely illustrates a case of financial loss.  A secure programming workaround gets rid of the security vulnerability, and the safety of the fixed smart contract is ensured by formal verification.
 
 The source codes for this project are available on github.
 
