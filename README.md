@@ -1,6 +1,6 @@
 # Reentrancy vulnerability of smart contracts
 
-The topic of this project is the reentrancy vulnerability of Solidity smart contracts.  We create a vulnerable smart contract, demonstrate how to exploit it, and apply formal verification to detect the vulnerability.  We also practice secure programming, and apply formal verification to ensure the safety of a fixed smart contract.
+The topic of this project is the reentrancy vulnerability of Solidity smart contracts.  We create a vulnerable smart contract, demonstrate how to exploit it, and apply formal verification to detect the vulnerability.  We also practice secure programming to fix the smart contract.  The safety of the improved smart contract is ensured through formal verification.
 
 The solidity compiler solc equips rich formal verification features.
 In order to carry it out for the reentrancy vulnerability, a programmer has to be aware of potential problems due to reentrancy and has to explicitly put assertions in a source code, that surely requires secure programming skills.  For this project, we don't suppose that programmers have such skills, and we are going to offer a prototypical solution for them, so that they get a warning of a presence of potential reentrancy vulnerability in their code without any prerequisite secure programming knowledge.  No warning means that there is no vulnerability and the smart contract is secure against the reentrancy vulnerability.
@@ -503,7 +503,7 @@ Due to our assertion on `Ext`, the formula <code>$x534</code> is apparently true
 ```
 Here, <code>=></code> stands for the logical implication.  For readability, we write `+`, `*`, and <code><=</code> for the arithmetical addition (`bvadd`), multiplication (`bvmul`), and less than or equal to (`bvule`) in bitvectors.
 
-<code>@x2953</code> is a proof of <code>(Ext [1] 2 [0] 1)</code>.  It is obtained by resolution applied to four arguments.  The first one, <code>(asserted $x953)</code> is a proof of the formula <code>$x953</code> due to assertions.  The solver uses assertions in particular concerning `Q_alpha`, `Q_1`, `Q_2`, `Q_3`, `Q_omega`, `T`, and `Ext` to carry out the proof.  The last argument, i.e. the fourth one, is <code>(Ext [1] 2 [0] 1)</code> which is the conclusion of this proof <code>@x2953</code>.  In order to obtain this conclusion, the solver also uses the second and the third arguments which are proofs of the non-trivial conjuncts of the body of the formula <code>$x953</code>, namely, of <code>(Ext H I A C)</code> and of <code>(Ext A D E F)</code>.  The first one is a direct use of <code>@x3082</code>, and we now see <code>(Ext H I A C)</code> is <code>(Ext [1] 2 [1] 2)</code>.  On the other hand, <code>((_ hyper-res 0 0) @x3083 (Ext ?x2347 (_ bv1 2) ?x2347 (_ bv1 2)))</code> has the conclusion <code>(Ext [1] 1 [1] 1)</code> which comes by a simple instantiation of <code>@x3083</code> due to resolution.
+<code>@x2953</code> is a proof of <code>(Ext [1] 2 [0] 1)</code>.  It is obtained by resolution applied to four arguments.  The first one, <code>(asserted $x953)</code> is a proof of the formula <code>$x953</code> due to assertions.  The solver uses assertions in particular concerning `Q_alpha`, `Q_1`, `Q_2`, `Q_3`, `Q_omega`, `T`, and `Ext` to carry out the proof.  The last argument, i.e. the fourth one, is <code>(Ext [1] 2 [0] 1)</code> which is the conclusion of this proof <code>@x2953</code>.  In order to obtain this conclusion, it suffices to prove the premise `$x951` of the implication in the kernel of `$x953`.  The solver does it by means of the resolution using the second and the third arguments.  They are necessary to prove the non-trivial conjuncts <code>(Ext H I A C)</code> and <code>(Ext A D E F)</code>.  The first one is due to a direct use of <code>@x3082</code>, and we now see <code>(Ext H I A C)</code> is <code>(Ext [1] 2 [1] 2)</code>.  On the other hand, <code>((_ hyper-res 0 0) @x3083 (Ext ?x2347 (_ bv1 2) ?x2347 (_ bv1 2)))</code> has the conclusion <code>(Ext [1] 1 [1] 1)</code> which comes by a simple instantiation of <code>@x3083</code> due to resolution.
 
 As we have discussed so far, both <code>(Ext [1] 2 [1] 2)</code> and <code>(Ext [1] 2 [0] 1)</code> are proven.  They show the divergent state transitions due to external behavior of the contract.  From the state <code>([1], 2)</code>, one goes to the identical state <code>([1], 2)</code> and the other goes to <code>([0], 1)</code>.  It is indeed the cause of the vulnerability.
 
@@ -566,10 +566,11 @@ The implementation of the official Solidity compiler solc has already had featur
 
 ## External links
 
-- getting proof trees from Spacer (https://github.com/Z3Prover/z3/issues/4863)
-- proof rules documented (https://github.com/Z3Prover/z3/blob/master/src/api/z3_api.h#L765)
-- https://www.alchemy.com/overviews/reentrancy-attack-solidity
-- https://hackernoon.com/hack-solidity-reentrancy-attack
+- SMTChecker and Formal Verification (https://docs.soliditylang.org/en/latest/smtchecker.html)
+- What is a reentrancy attack in Solidity? https://www.alchemy.com/overviews/reentrancy-attack-solidity
+- Hack Solidity: Reentrancy Attack https://hackernoon.com/hack-solidity-reentrancy-attack
+- Getting proof trees from Spacer (https://github.com/Z3Prover/z3/issues/4863)
+- Hyper-resolution rule (https://github.com/Z3Prover/z3/blob/master/src/api/z3_api.h#L748)
 
 ## References
 
