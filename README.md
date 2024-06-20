@@ -22,7 +22,7 @@ The following Solidity code implements a coin jar.
 The expected use case is that anybody can make a deposit, and anytime in the future, the depositor can withdraw money.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
-pragma solidity >=0.8.0<0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
 
 contract Jar {
 
