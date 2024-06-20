@@ -495,9 +495,9 @@ Due to our assertion on `Ext`, the formula <code>$x534</code> is apparently true
          (Ext A D E F)
          (not (= (select A B) 0))
          (= D (+ C (* 3 (select A B))))
-		 (= G (store E B 0))
-		 (<= (select A B) C))
-	(Ext H I G F))
+         (= G (store E B 0))
+         (<= (select A B) C))
+    (Ext H I G F))
 ```
 Here, <code>=></code> stands for the logical implication.  For readability, we write `+`, `*`, and <code><=</code> for the arithmetical addition (`bvadd`), multiplication (`bvmul`), and less than or equal to (`bvule`) in bitvectors.
 
@@ -514,7 +514,7 @@ As we have discussed so far, both <code>(Ext [1] 2 [1] 2)</code> and <code>(Ext 
      (not (= (select A B) 0))
      (= E (+ D (* 3 (select A B))))
      (= I (+ D (* 3 (select A B))))
-	 (= H (store F B 0))
+     (= H (store F B 0))
      (= L (store J B 0))
      (not (or (= L H) (not (= K G))))
      (<= (select A B) D))
@@ -537,7 +537,7 @@ In order to prove <code>query!0 A D B C L K 0 0 H G</code>, the conclusion of th
      (T A D B C H G 0)
      (= 0 0)
      (= 0 0)
-	 (not (and (= L H) (= K G))))
+     (not (and (= L H) (= K G))))
 ```
 is straightforwardly implied from the conjunction formula <code>$x997</code> by means of the assertions concerning `Jar`, `T`, `Q_1`, `Q_2`, `Q_3`, and `Q_omega` in our model.  Notice that the premises concerning <code>Ext</code> is necessary as the body of the Horn clause concerning `Q_3` involves `Ext`.  By resolution, the body of the Horn clause <code>$x999</code> is all proven, thanks to the additionally supplied proofs <code>@x2953</code> and <code>@x3082</code>, which respectively claim <code>(Ext [1] 2 [0] 1)</code> and <code>(Ext [1] 2 [1] 2)</code>, and it gives a proof of <code>$x2931</code>, that is <code>(query!0 [1] 3 unit 0 [0] 1 0 0 [0] 2)</code>.
 It clarifies that there are two diverging transactions as mentioned at the beginning of this section, and moreover it contradicts the asserted security property.
