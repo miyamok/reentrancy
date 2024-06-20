@@ -45,7 +45,7 @@ contract Jar {
 The state variable <code>balance</code> is an array of unsigned integers indexed by address.  It records which contract address has how much deposit.
 The constructor does nothing, but is <code>payable</code>, namely, this contract may receive money through the deployment.
 It has two external functions:
-- <code>deposit</code> is to deposit crypto currency into this jar contract.
+- <code>deposit</code> is to deposit cryptocurrency into this jar contract.
 - <code>withdraw</code> is to withdraw one's deposit.
 
 In <code>deposit</code>, the balance of the sender is increased by the amount of sent money by means of the following two objects,
@@ -341,7 +341,7 @@ There are two new elements, one is a new function `bvsub` for the subtraction in
 			 (= r 0))
 		    (Ext b tb b^^ tb^^))))
 ```
-An unknown external function is arbitrary in general, and it can involve calls to the public or external functions of any other contracts including `Jar`.  The idea is to abstractly model how such an unkonwn function affects <code>Jar</code>.  `Ext` is defined as a boolean valued function which takes four arguments.  The first two represents a state which consists of `b` and `tb`, i.e. the state variable `balance` and the amount of the native asset, `this.balance`, of <code>Jar</code>.  In principle, here we should list all publicly available data of the contract relevant to the formal analysis.  The other two arguments represent a possible future state of `Jar` as a result of executing an unknown function, which may involve function calls to `deposit` and `withdraw`.  The above three Horn clauses represent the case where no external behavior changing the states and the cases where `deposit` and `withdraw` caused external behaviors, respectively.
+An unknown external function is arbitrary in general, and it can involve calls to the public or external functions of any other contracts including `Jar`.  The idea is to abstractly model how such an unknown function affects <code>Jar</code>.  `Ext` is defined as a boolean valued function which takes four arguments.  The first two represents a state which consists of `b` and `tb`, i.e. the state variable `balance` and the amount of the native asset, `this.balance`, of <code>Jar</code>.  In principle, here we should list all publicly available data of the contract relevant to the formal analysis.  The other two arguments represent a possible future state of `Jar` as a result of executing an unknown function, which may involve function calls to `deposit` and `withdraw`.  The above three Horn clauses represent the case where no external behavior changing the states and the cases where `deposit` and `withdraw` caused external behaviors, respectively.
 
 Now we are able to discuss the Horn clause of `Q_3` (same as above)
 ```
@@ -356,7 +356,7 @@ Now we are able to discuss the Horn clause of `Q_3` (same as above)
 ```
 This models that `l_b` and `l_tb` came from `Q_2` goes to any `l_b^` and `l_tb^` satisfying `Ext l_b l_tb l_b^ l_tb^`, that means the state of `l_b` and `l_tb` goes to another state of `l_b^` and `l_tb^` due to a transition due to an external behavior.
 ### Modeling the smart contract `Jar`
-Considering the lifetime of smart contracts, it has the initial state and states reachable from the initial one through transactions.  This is modeled by Init and Jar as follows, assuming `zeros` is an empty mapping (all values are zero).  `tb` is arbitrary and represents that it may receive any amount of native asset through the deployment, as the constructor of `Jar` is payable.  `Jar` represents the contract's state, which is understood as a tree whose root is of the initial state, and branches are formed due to one step transition without a revert.
+Considering the lifetime of smart contracts, it has the initial state and states reachable from the initial one through transactions.  This is modeled by `Init` and `Jar` as follows, assuming `zeros` is an empty mapping (all values are zero).  `tb` is arbitrary and represents that it may receive any amount of native asset through the deployment, as the constructor of `Jar` is payable.  `Jar` represents the contract's state, which is understood as a tree whose root is of the initial state, and branches are formed due to one step transition without a revert.
 ```
 (assert (forall ((tb BUINT)) (Init zeros tb)))
 
@@ -415,7 +415,7 @@ We are going to see how to practice formal verification by means of the SMT solv
 
 It required some modification of the model, in order to get the above vulnerability scenario, for instance, deactivating a Horn clause describing the external behavior of Jar due to the <code>deposit</code> function which is indeed innocent.
 Executing Z3 for the model and the security property mentioned in the previous sections without a modification, we didn't get an answer from Z3 in a reasonable time consumption (after half a day, we gave up).
-The following version of the definition of Init enabled me to get an answer in a few seconds.
+The following version of the definition of `Init` enabled me to get an answer in a few seconds.
 ```
 (assert (forall ((b M) (tb BUINT)) (=> (Init b tb) (Jar b tb))))
 ```
@@ -460,13 +460,13 @@ Z3 provides the following proof of unsatisfiability in seconds.  We are going to
 ```
 In the same way as SMTLIB2, the output is in the S-expression of Lisp.
 The proof begins with the specification of the logic, that is HORN as we specified in the original model definition.
-The function <code>query!0</code> is boolean valued, and this boolean value is meant to stand for the negation of the security property.  Its arguments are corresponding to the universally quantified variables of the last assertion, the security property.  Recall that our unsatisfiability proof is an evidence of the fact that the negation of the security property holds under the condition that all the other assertions hold.  The negation of the security property is logically equivalent to an existential formula (due to the duality of the quantifiers).  An unsatisfiability proof by Z3 provides a concrete instantiation, i.e. the witness, of those existentially quantified variables, and the witness and logical resoning present in the proof show the divergent behaviors of the smart contract.
+The function <code>query!0</code> is boolean valued, and this boolean value is meant to stand for the negation of the security property.  Its arguments are corresponding to the universally quantified variables of the last assertion, the security property.  Recall that our unsatisfiability proof is an evidence of the fact that the negation of the security property holds under the condition that all the other assertions hold.  The negation of the security property is logically equivalent to an existential formula (due to the duality of the quantifiers).  An unsatisfiability proof by Z3 provides a concrete instantiation, i.e. the witness, of those existentially quantified variables, and the witness and logical reasoning present in the proof show the divergent behaviors of the smart contract.
 
 The next line opens the proof object.
 We see a sequence of definitions due to <code>let</code> construct.
 Variables with the prefix <code>?</code> points to data such as a mapping and a bitvector.  Also, the prefix <code>$</code> means a variable pointing to a boolean value and <code>@</code> a proof.  The mapping is of the sort <code>Array Unit (_ BitVec 2)</code>, that is a mapping from the singleton to the bitvector of length 2.  Note that the singleton value is unique, and hence this mapping is isomorphic to the bitvector of length 2.
 
-<code>?x2247</code> points to the balance whose value is constantly 0.  Here, <code>(_ bv0 2)</code> is 0 of the sort bitvecor of length 2.  We denote it as an array <code>[0]</code>.
+<code>?x2247</code> points to the balance whose value is constantly 0.  Here, <code>(_ bv0 2)</code> is 0 of the sort bitvector of length 2.  We denote it as an array <code>[0]</code>.
 
 <code>?x2347</code> is the array <code>[1]</code>.  It is obtained by updating the 0th element (the unique element because of unit) of `?x2247` to be 1.
 
@@ -545,17 +545,13 @@ It clarifies that there are two diverging transactions as mentioned at the begin
 ## Satisfiable result for secure Jar
 
 Thanks to the lock object, the reentrancy is prevented and we get a satisfiable result of Z3, which means that there is no concern about the reentrancy vulnerability.
-In order for a fully automated verification, <code>deposit</code> is also locked as well as <code>withdraw</code> is.  It makes it impossible to make a deposit by making use of reentyrancy.  This is harmless to prohibit such a thing, and we consider this additional lock of <code>deposit</code> is acceptable for carrying out verification.  The SMT model for the fixed Jar contract doesn't require any essentially new feature.
-
-<!-- ## Implementation
-
-TODO: automatically generate a model and a security property for a given source code, so that a theorem prover practices formal verification. -->
+In order for a fully automated verification, <code>deposit</code> is also locked as well as <code>withdraw</code> is.  It makes it impossible to make a deposit by making use of reentrancy.  This is harmless to prohibit such a thing, and we consider this additional lock of <code>deposit</code> is acceptable for carrying out verification.  The SMT model for the fixed Jar contract doesn't require any essentially new feature.
 
 ## Future work
 
 Our future work can be split into two kinds.  The one is about the performance of automated reasoning, and the second is about the optimality, generality, and automated extraction of the security property.  
 
-An improvement for the performance of automated reasoning is crucial, because it indeed prevented us from us employing a proper security propery and as a result we had to accept ad-hoc modifications to the security property.  Due to the same reason, it is also not possible to make use of an invariance, described below, at the moment.
+An improvement for the performance of automated reasoning is crucial, because it indeed prevented us from us employing a proper security property and as a result we had to accept ad-hoc modifications to the security property.  Due to the same reason, it is also not possible to make use of an invariance, described below, at the moment.
 One common strategy is to use several tools in parallel and make use of available results.  We will follow it and try other SMT solvers and theorem provers to overcome this issue.
 We already tried the SMT solver cvc5, but it did not show a better performance over Z3/Spacer for our particular problem.
 
