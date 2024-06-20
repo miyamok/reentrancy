@@ -350,8 +350,10 @@ Now we are able to discuss the Horn clause of `Q_3` (same as above)
 	  (tb BUINT) (l_tb BUINT) (l_tb^ BUINT) (b^ M) (tb^ BUINT) (b^^ M) (tb^^ BUINT))
 	 (=> (and (Q_2 b s v tb l_b l_s l_v l_tb l_r)
 		  (and (Ext b^ tb^ b^^ tb^^)
-		       (= b^ l_b) (= b^^ l_b^)
-		       (= tb^ l_tb) (= tb^^ l_tb^)))
+		       (= b^ l_b)
+		       (= b^^ l_b^)
+		       (= tb^ l_tb)
+		       (= tb^^ l_tb^)))
 	     (Q_3 b s v tb l_b^ l_s l_v l_tb^ l_r))))
 ```
 This models that `l_b` and `l_tb` came from `Q_2` goes to any `l_b^` and `l_tb^` satisfying `Ext l_b l_tb l_b^ l_tb^`, that means the state of `l_b` and `l_tb` goes to another state of `l_b^` and `l_tb^` due to a transition due to an external behavior.
@@ -386,12 +388,12 @@ We are at the last step to model the security property as follows.
           (b^ M) (tb^ BUINT) (r^ Int)
           (r_^ Int) (b_^ M) (tb_^ BUINT))
          (not (and (Jar b tb)
-              (T b tb s v b^ tb^ r^)
-              (T b tb s v b_^ tb_^ r_^)
-              (= r^ 0)
-              (= r_^ 0)
-              (not (and (= b^ b_^)
-                   (= tb^ tb_^)))))))
+                   (T b tb s v b^ tb^ r^)
+                   (T b tb s v b_^ tb_^ r_^)
+                   (= r^ 0)
+                   (= r_^ 0)
+                   (not (and (= b^ b_^)
+                             (= tb^ tb_^)))))))
 ```
 This Horn clause represents the property that result of a call to `withdraw` is deterministic. 
 In case this property is violated, a call to `withdraw` yields different results depending on an unknown external contracts.  The SMT solver answers `unsat` and gives a proof log which witnesses two distinct results which can be yielded by a function call.
