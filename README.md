@@ -460,7 +460,7 @@ Z3 provides the following proof of unsatisfiability in seconds.  We are going to
                                 (=> $x997 (query!0 A D B C L K 0 0 H G)))) ))
            (mp ((_ hyper-res 0 0 0 1 0 2) (asserted $x999) @x2953 @x3082 $x2931) (asserted (=> $x2931 false)) false))))))))))))
 ```
-In the same way as SMTLIB2, the output is in the S-expression of Lisp.
+In the same way as SMTLIB2, the output is in the S-expression of Lisp, where a list `(a b c)` denotes a function application `a(b, c)` in the common mathematical notation.
 The proof begins with the specification of the logic, that is HORN as we specified in the original model definition.
 The function <code>query!0</code> is boolean valued, and this boolean value is meant to stand for the negation of the security property.  Its arguments are corresponding to the universally quantified variables of the last assertion, the security property.  Recall that our unsatisfiability proof is an evidence of the fact that the negation of the security property holds under the condition that all the other assertions hold.  The negation of the security property is logically equivalent to an existential formula (due to the duality of the quantifiers).  An unsatisfiability proof by Z3 provides a concrete instantiation, i.e. the witness, of those existentially quantified variables, and the witness and logical reasoning present in the proof show the divergent behaviors of the smart contract.
 
