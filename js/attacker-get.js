@@ -1,31 +1,6 @@
 const ethers = require('ethers');
 require('dotenv').config();
 
-const jarABI = [
-    {"inputs":[],
-     "stateMutability":"payable",
-     "type":"constructor"},
-    {"inputs":[{"internalType":"address",
-		"name":"",
-		"type":"address"}],
-     "name":"balance",
-     "outputs":[{"internalType":"uint256",
-		 "name":"",
-		 "type":"uint256"}],
-     "stateMutability":"view",
-     "type":"function"},
-    {"inputs":[],
-     "name":"deposit",
-     "outputs":[],
-     "stateMutability":"payable",
-     "type":"function"},
-    {"inputs":[],
-     "name":"withdraw",
-     "outputs":[],
-     "stateMutability":"nonpayable",
-     "type":"function"}
-];
-
 const attackerABI = [
   {
     "inputs":[

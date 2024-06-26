@@ -1,31 +1,6 @@
 const ethers = require('ethers');
 require('dotenv').config();
 
-const jarABI = [
-    {"inputs":[],
-     "stateMutability":"payable",
-     "type":"constructor"},
-    {"inputs":[{"internalType":"address",
-		"name":"",
-		"type":"address"}],
-     "name":"balance",
-     "outputs":[{"internalType":"uint256",
-		 "name":"",
-		 "type":"uint256"}],
-     "stateMutability":"view",
-     "type":"function"},
-    {"inputs":[],
-     "name":"deposit",
-     "outputs":[],
-     "stateMutability":"payable",
-     "type":"function"},
-    {"inputs":[],
-     "name":"withdraw",
-     "outputs":[],
-     "stateMutability":"nonpayable",
-     "type":"function"}
-];
-
 const attackerABI = [{"inputs":[{"internalType":"address","name":"_jar","type":"address"}],"stateMutability":"payable","type":"constructor"},{"inputs":[],"name":"attack","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"get","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"jar","outputs":[{"internalType":"contract IJar","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"prepare","outputs":[],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}];
 
 async function main() {
@@ -42,13 +17,6 @@ async function main() {
     attackerABI,
     wallet
   );
-
-  // const jarContract = new ethers.Contract(
-  //   jarAddress,
-  //   jarABI,
-  //   wallet
-  // );
-
   await attackerContract.attack();
   console.log("Attacker's attack() called")
 }

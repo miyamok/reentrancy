@@ -14,7 +14,7 @@ async function main() {
   let wallet = new ethers.Wallet(privateKey, provider);
 
   let factory = new ethers.ContractFactory(artifacts.abi, artifacts.bytecode, wallet);
-  const initialBalance = ethers.parseEther("0.01");
+  const initialBalance = ethers.parseEther("1");
 
   let attacker = await factory.deploy(process.env.JAR_ADDRESS, {value: initialBalance});
 

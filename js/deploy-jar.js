@@ -5,7 +5,7 @@ async function main() {
 
   const url = process.env.SEPOLIA_URL;
   let artifacts = await hre.artifacts.readArtifact("Jar");
-  const initialBalance = ethers.parseEther("0.02");
+  const initialBalance = ethers.parseEther("2");
 
   const provider = new ethers.JsonRpcProvider(url);
 
