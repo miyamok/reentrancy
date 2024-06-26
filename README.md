@@ -117,10 +117,176 @@ In <code>withdraw</code> of <code>Jar</code> the condition <code>balance[msg.sen
 
 ## Demonstration
 
-We demonstrate the reentrancy in an actual blockchain.
-The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia test net as well as on the remix IDE (https://remix.ethereum.org/).
+We demonstrate the reentrancy vulnerability and also secure programming within the Hardhat environment, on an actual blockchain, and on the Remix IDE.
+<!-- The full source code relies on various technologies such as solidity, hardhat, and ethers.js, and the demonstration is done on Sepolia test net as well as on the remix IDE (https://remix.ethereum.org/).
 
-TODO: describe further contents.
+TODO: describe further contents. -->
+
+### Hardhat
+
+Hardhat offers a local environment for smart contract development, where one can compile, deploy, and test smart contracts.
+
+We assume npm is available.
+You move to your project's directory, then the following commands install and set up Hardhat and other packages such as ethers.js.
+```
+% npm install --save-dev --legacy-peer-deps hardhat
+% npm install --legacy-peer-deps @nomiclabs/hardhat-waffle ethereum-waffle chai @nomiclabs/hardhat-ethers ethers@5.7.2 dotenv
+% npm init -y
+% npx hardhat
+```
+The last command starts an interactive set up program, where you choose the javascript project and say yes to everything else.
+
+Let's see how the test script goes.
+```
+% npx hardhat test test/Attacker.js
+
+
+  Reentrancy vulnerability
+Jar deployed at 0x5FbDB2315678afecb367f032d93F642f64180aa3
+Attacker deployed at 0x8464135c8F25Da09e49BC8782676a84730C318bC
+
+Jar's ETH balance 10.0
+Attacker's ETH balance 1.0
+Attacker's ETH deposit in Jar 0.0
+
+* Call to Attacker.prepare()
+Jar's ETH balance 11.0
+Attacker's ETH balance 0.0
+Attacker's ETH deposit in Jar 1.0
+
+* Call to Attacker.attack()
+Jar's ETH balance 0.0
+Attacker's ETH balance 11.0
+Attacker's ETH deposit in Jar 0.0
+    ✔ Attacker successfully attacks Jar (736ms)
+
+
+  1 passing (741ms)
+```
+The first line is the npx command one has to issue.
+Then the test script, `test/Attacker.js` does the following steps
+1. Deploys the Jar contract, sending 10 ETH to it.
+2. Deploys the Attacker contract, supplying the Jar contract's address to the constructor and also sending 1 ETH.
+3. It prints out the addresses of the contracts and their status.
+4. Calls `prepare()` function of Attacker.  It let Attacker make 1 ETH deposit into Jar.
+5. It prints out the status.
+6. Calls `attack()` function of Attacker.  It makes use of the reentrancy vulnerability of Jar, and moves all the asset of Jar to Attacker.
+
+The secured Jar contract isn't vulnerable anymore, as the following test result shows that the Attacker's attempt has been foiled.
+```
+% npx hardhat test test/Secure.js
+
+
+  Reentrancy vulnerability
+JarLocked deployed at 0x5FbDB2315678afecb367f032d93F642f64180aa3
+Attacker deployed at 0x8464135c8F25Da09e49BC8782676a84730C318bC
+
+JarLocked's ETH balance 10.0
+Attacker's ETH balance 1.0
+Attacker's ETH deposit in JarLocked 0.0
+
+* Call to Attacker.prepare()
+JarLocked's ETH balance 11.0
+Attacker's ETH balance 0.0
+Attacker's ETH deposit in JarLocked 1.0
+
+* Call to Attacker.attack()
+JarLocked's ETH balance 11.0
+Attacker's ETH balance 0.0
+Attacker's ETH deposit in JarLocked 1.0
+    ✔ Attacker fails to attack JarLocked (972ms)
+
+
+  1 passing (977ms)
+```
+In this test script, it expects that `attack()` causes a revert. It indeed happens, and the asset of Jar is secured.
+
+### On blockchain
+
+We make use of the alchemy API for the demonstration on Sepolia test net.
+We assume you have done the Hardhat installation procedure written in the above subsection on Hardhat.
+
+In the directory `js`, you find the following scripts:
+```
+attacker-asset-balance.js
+attacker-attack.js
+attacker-get.js
+attacker-prepare.js
+deploy-attacker.js
+deploy-jar.js
+jar-asset-balance.js
+jar-deposit-balance.js
+```
+Those scripts are prepared to cerry out the demonstration.
+It relies on additional information provided by the file `.env` at the project root containing
+```
+SEPOLIA_URL=https://eth-sepolia.g.alchemy.com/v2/XXXXXXX
+PRIVATE_KEY=0xXXXXXXXX
+API_KEY=XXXXXXXX
+JAR_ADDRESS=
+ATTACKER_ADDRESS=
+```
+where the first three should come from your alchemy API account page.
+The last two are vacant at the beginning, and you are going to manually fill in them through the deployment process.
+In the github repository, you find the file `.env.dummy` for the template to create `.env`.
+
+Even in case you have limited amount of test ethers, you can go through the demonstration by modifying the following numbers.
+
+1. In `contract/Attacker.sol` two occurrences of `1 ether` can be smaller, eg. `0.01 ether`.
+2. In `js/deploy-jar.js` the definition of `initialBalance` can be changed, eg. `0.02 ether`.
+3. In `js/deploy-attacker.js` and the definition of `initialBalance` can be changed, eg. `0.01 ether`.
+
+At the root directory of the project, issue the following command
+```
+% npx hardhat run js/deploy-jar.js
+```
+This deploys the Jar contract, and prints a line containing the address of the deployed contract.  Copy the address and fill out the corresponding entry in the `.env` file.
+Issue the following command to deploy the attacker.
+```
+% npx hardhat run js/deploy-attacker.js
+```
+It reads the address of the deployed Jar contract from `.env`, and supply it to the constructor of Attacker.
+You see the message containing the address of the deployed attacker contract.  Copy the address and fill out the corresponding entry in the `.env` file.
+
+The process of the deployment has been done, and we are going to see the reentrancy vulnerability by now.
+Issue the following command to call `Attacker.prepare()`
+```
+% npx hardhat run js/attacker-prepare.js
+```
+The attacker contract makes a deposit into the jar contract.
+You can now see how the balances are.
+```
+% npx hardhat run js/jar-asset-balance.js
+Jar's ETH asset balance amounts to 0.03
+% npx hardhat run js/jar-deposit-balance.js
+Attacker's deposit in Jar amounts to 0.01
+% npx hardhat run js/attacker-asset-balance.js
+Attacker's ETH asset balance amounts to 0
+```
+Note that `jar-deposit-balance.js` displays the deposit balance of attaker in the jar contract.
+
+Issue the following command to call `Attacker.attack()`
+```
+% npx hardhat run js/attacker-attack.js
+```
+The attacker contract attacks the jar contract and withdraw `0.03 ETH` rather than its actual deposit `0.01 ETH`
+```
+% npx hardhat run js/jar-asset-balance.js
+Jar's ETH asset balance amounts to 0
+% npx hardhat run js/jar-deposit-balance.js
+Attacker's deposit in Jar amounts to 0
+% npx hardhat run js/attacker-asset-balance.js
+Attacker's ETH asset balance amounts to 0.03
+```
+By issueing the following command, one can move the asset of the attacker to its deployer.
+```
+% npx hardhat run js/attacker-get.js
+```
+
+### Remix IDE
+
+The Remix IDE is a browser based online IDE for smart contract development.
+Just opening https://remix.ethereum.org/ , anyone can start coding, without any preparation/installation on a local computer.
 
 ## Secure programming to prevent reentrancy
 
