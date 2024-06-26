@@ -65,7 +65,7 @@ A security problem may arise if <code>msg.sender</code> is a smart contract rath
 
 We are going to see that we can create a malicious contract which can steal money from the Jar contract by repeatedly calling the <code>withdraw</code> function of the Jar contract.
 
-## Attacking a vulnerable contract
+## Attacking the vulnerable contract
 The following smart contract is a successful attacker.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
@@ -339,6 +339,11 @@ By issueing the following command, one can move the asset of the attacker to its
 % npx hardhat run js/attacker-get.js
 ```
 
+On the other hand, a secured version of Jar is deployed by the folloing command
+```
+% npx hardhat run js/deploy-jarlocked.js
+```
+The rest of the procedure is same, using the other js codes, and one can see that the attacker's attempt is foiled.
 ### Remix IDE
 
 The Remix IDE is a browser based online IDE for smart contract development.
