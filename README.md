@@ -115,6 +115,62 @@ An attacker deploys <code>Attacker</code>, providing the address of the target <
 In the course of <code>Attacker</code>'s receiving money, its <code>receive</code> function is executed.  It checks that the asset of <code>Jar</code> amounts to at least 1 ETH, and if so, it tries to further withdraw 1 ETH by calling <code>withdraw</code> of <code>Jar</code>, which causes the so-called <i>reentrancy</i>.
 In <code>withdraw</code> of <code>Jar</code> the condition <code>balance[msg.sender] != 0</code> is still satisfied, and therefore <code>Jar</code> again sends 1 ETH to <code>Attacker</code>.  <code>Attacker</code> stops calling <code>withdraw</code> when the amount of the asset of <code>Jar</code> subceeds 1 ETH, and the whole transaction is successfully over without a revert.
 
+## Secure programming to prevent reentrancy
+
+We discuss a couple of workarounds to prevent the above mentioned problem.
+A commonly suggested cure for the vulnerability is to make use of a lock to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.
+
+### Lock
+
+A lock object creates a critical region in the source code to prevent an unexpected reentrancy.  A lock object is implemented via a boolean.  Before entering a critical region, it checks the lock.  If the lock is false, it indicates that the critical region is not locked, and one may enter the region, switching the lock to true.  After getting out of the region, the lock is reset to false.  As long as the lock is true, it is not allowed to newly enter the critical region.
+In the <code>Jar</code> contract, the line of <code>msg.sender.call</code> should be a crucial part of the critical region.
+An easy way of implementing it is to use <code>ReentranceGuard</code> of openzeppelin (https://github.com/binodnp/openzeppelin-solidity/blob/master/docs/ReentrancyGuard.md).
+They provide a modifier <code>nonReentrant</code> which should be applied to a function.  In our example, <code>withdraw</code> should get this modifier, so that the whole content, surely including the above mentioned critical line, is under the control of the lock object.
+<code>Attacker</code> fails to steal money, because in the first reentrancy (i.e. the second time call of <code>withdraw</code>), the reentrancy is detected and the whole transaction is reverted.
+
+The fixed <code>Jar</code> contract looks as follows.
+```
+// SPDX-License-Identifier: CC-BY-4.0
+pragma solidity >=0.8.0 <0.9.0;
+
+contract Jar {
+    mapping(address=>uint) public balance;
+    bool locked;
+    constructor() payable {}
+
+    function deposit() public payable {
+        balance[msg.sender] += msg.value;
+    }
+
+    function withdraw() public {
+        require(!locked, "withdraw(): reentrancy not allowed");
+        locked = true;
+        require(balance[msg.sender] != 0, "zero balance");
+        (bool s,) = msg.sender.call{ value: balance[msg.sender] }("");
+        require(s, "In Jar.withdraw(), call() failed.");
+        balance[msg.sender] = 0;
+	    locked = false;
+    }
+}
+```
+### Updating the critical value before transfer
+
+Another solution particularly applicable to our case is to set zero for <code>balance[msg.sender]</code> immediately after checking the non-zero and before the transfer.  By this change, the deposit of the attacker is already zero in the reentrancy call, and hence the whole transaction is reverted.
+
+### Underflow
+
+In Solidity version 0.8 and above, arithmetic operations revert on underflow.  Consider the following version of <code>withdraw</code>.
+```
+function withdraw() public {
+    uint amount = balance[msg.sender];
+    require(amount != 0, "zero balance");
+    (bool s,) = msg.sender.call{ value: amount }("");
+    require(s, "In Jar.withdraw(), call() failed.");
+    balance[msg.sender] -= amount;
+}
+```
+Instead of putting zero for the balance, it subtracts the amount of transfer, where <code>amount</code> is defined at the very beginning.  After <code>Attacker</code> stopped withdrawal, the repeated subtraction causes an arithmetical underflow, because <code>balance[msg.sender]</code> is of type unsigned integer.  In case of reentrancy, the whole transaction is reverted, and the contract is secure against <code>Attacker</code>.
+
 ## Demonstration
 
 We demonstrate the reentrancy vulnerability and also secure programming within the Hardhat environment, on an actual blockchain, and on the Remix IDE.
@@ -293,62 +349,6 @@ https://github.com/miyamok/reentrancy/blob/main/contracts/Jar.sol
 https://github.com/miyamok/reentrancy/blob/main/contracts/Attacker.sol
 ```
 Consult details for the Remix documentation and tutorials.
-
-## Secure programming to prevent reentrancy
-
-We discuss a couple of workarounds to prevent the above mentioned problem.
-A commonly suggested cure for the vulnerability is to make use of a lock to prohibit the reentrancy.  Changing the balance before invoking <code>call</code> is also a solution.
-
-### Lock
-
-A lock object creates a critical region in the source code to prevent an unexpected reentrancy.  A lock object is implemented via a boolean.  Before entering a critical region, it checks the lock.  If the lock is false, it indicates that the critical region is not locked, and one may enter the region, switching the lock to true.  After getting out of the region, the lock is reset to false.  As long as the lock is true, it is not allowed to newly enter the critical region.
-In the <code>Jar</code> contract, the line of <code>msg.sender.call</code> should be a crucial part of the critical region.
-An easy way of implementing it is to use <code>ReentranceGuard</code> of openzeppelin (https://github.com/binodnp/openzeppelin-solidity/blob/master/docs/ReentrancyGuard.md).
-They provide a modifier <code>nonReentrant</code> which should be applied to a function.  In our example, <code>withdraw</code> should get this modifier, so that the whole content, surely including the above mentioned critical line, is under the control of the lock object.
-<code>Attacker</code> fails to steal money, because in the first reentrancy (i.e. the second time call of <code>withdraw</code>), the reentrancy is detected and the whole transaction is reverted.
-
-The fixed <code>Jar</code> contract looks as follows.
-```
-// SPDX-License-Identifier: CC-BY-4.0
-pragma solidity >=0.8.0 <0.9.0;
-
-contract Jar {
-    mapping(address=>uint) public balance;
-    bool locked;
-    constructor() payable {}
-
-    function deposit() public payable {
-        balance[msg.sender] += msg.value;
-    }
-
-    function withdraw() public {
-        require(!locked, "withdraw(): reentrancy not allowed");
-        locked = true;
-        require(balance[msg.sender] != 0, "zero balance");
-        (bool s,) = msg.sender.call{ value: balance[msg.sender] }("");
-        require(s, "In Jar.withdraw(), call() failed.");
-        balance[msg.sender] = 0;
-	    locked = false;
-    }
-}
-```
-### Updating the critical value before transfer
-
-Another solution particularly applicable to our case is to set zero for <code>balance[msg.sender]</code> immediately after checking the non-zero and before the transfer.  By this change, the deposit of the attacker is already zero in the reentrancy call, and hence the whole transaction is reverted.
-
-### Underflow
-
-In Solidity version 0.8 and above, arithmetic operations revert on underflow.  Consider the following version of <code>withdraw</code>.
-```
-function withdraw() public {
-    uint amount = balance[msg.sender];
-    require(amount != 0, "zero balance");
-    (bool s,) = msg.sender.call{ value: amount }("");
-    require(s, "In Jar.withdraw(), call() failed.");
-    balance[msg.sender] -= amount;
-}
-```
-Instead of putting zero for the balance, it subtracts the amount of transfer, where <code>amount</code> is defined at the very beginning.  After <code>Attacker</code> stopped withdrawal, the repeated subtraction causes an arithmetical underflow, because <code>balance[msg.sender]</code> is of type unsigned integer.  In case of reentrancy, the whole transaction is reverted, and the contract is secure against <code>Attacker</code>.
 
 # Formal verification
 
