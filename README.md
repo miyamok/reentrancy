@@ -287,7 +287,7 @@ By issueing the following command, one can move the asset of the attacker to its
 
 The Remix IDE is a browser based online IDE for smart contract development.
 Just opening https://remix.ethereum.org/ , anyone can start coding, without any preparation/installation on a local computer.
-You can start the demonstration by import from github the following URLs
+You can start the demonstration for the reentrancy vulnerability by importing from github the following URLs
 ```
 https://github.com/miyamok/reentrancy/blob/main/contracts/Jar.sol
 https://github.com/miyamok/reentrancy/blob/main/contracts/Attacker.sol
