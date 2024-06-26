@@ -29,6 +29,7 @@ describe("Reentrancy vulnerability", function () {
     console.log("* Call to Attacker.prepare()");
     await attackerContract.prepare();
     const jarBalance = await ethers.provider.getBalance(jarAddress);
+    const attackerBalance = await ethers.provider.getBalance(attackerAddress);
     console.log("JarLocked's ETH balance " + ethers.formatEther(jarBalance));
     console.log("Attacker's ETH balance " + ethers.formatEther(await ethers.provider.getBalance(attackerAddress)));
     console.log("Attacker's ETH deposit in JarLocked " + ethers.formatEther(await jarContract.balance(attackerAddress)));
@@ -36,7 +37,7 @@ describe("Reentrancy vulnerability", function () {
 
     console.log("* Call to Attacker.attack()");
     await expect(attackerContract.attack()).to.be.revertedWith(
-      "In Jar.withdraw(), call() failed."
+      "In JarLocked.withdraw(), call() failed."
     );
     
     console.log("JarLocked's ETH balance " + ethers.formatEther(await ethers.provider.getBalance(jarAddress)));
@@ -44,5 +45,6 @@ describe("Reentrancy vulnerability", function () {
     console.log("Attacker's ETH deposit in JarLocked " + ethers.formatEther(await jarContract.balance(attackerAddress)));
 
     expect(await ethers.provider.getBalance(jarAddress)).to.equal(jarBalance);
+    expect(await ethers.provider.getBalance(attackerAddress)).to.equal(attackerBalance);
   });
 });

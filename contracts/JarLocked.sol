@@ -16,7 +16,7 @@ contract JarLocked {
     	locked = true;
         require(balance[msg.sender] != 0, "zero balance");
         (bool s,) = msg.sender.call{ value: balance[msg.sender] }("");
-        require(s, "In Jar.withdraw(), call() failed.");
+        require(s, "In JarLocked.withdraw(), call() failed.");
         balance[msg.sender] = 0;
         locked = false;
     }
