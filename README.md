@@ -127,10 +127,10 @@ TODO: describe further contents. -->
 Hardhat offers a local environment for smart contract development, where one can compile, deploy, and test smart contracts.
 
 We assume npm is available.
-You move to your project's directory, then the following commands install and set up Hardhat and other packages such as ethers.js.
+You move to your project's directory, then the following commands install and set up Hardhat and other packages such as ethers.js@v6.
 ```
 % npm install --save-dev --legacy-peer-deps hardhat
-% npm install --legacy-peer-deps @nomiclabs/hardhat-waffle ethereum-waffle chai @nomiclabs/hardhat-ethers ethers@5.7.2 dotenv
+% npm install --legacy-peer-deps @nomiclabs/hardhat-waffle ethereum-waffle chai @nomiclabs/hardhat-ethers ethers dotenv
 % npm init -y
 % npx hardhat
 ```
