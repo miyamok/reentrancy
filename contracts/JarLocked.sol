@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC-BY-4.0
 pragma solidity >=0.8.0 <0.9.0;
 
-contract Jar {
+contract JarLocked {
     mapping(address=>uint) public balance;
     bool locked;
     constructor() payable {}
