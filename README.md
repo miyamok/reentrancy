@@ -9,7 +9,7 @@ The rest of this document is organized as follows.  We first review what the ree
 
 The source codes for this project are available on github.
 
-# Reentrancy
+# Reentrancy attack
 
 The reentrancy is a programming concept where a function call causes another function call to itself before the original function call ends.
 In the context of smart contracts, a function which allows reentrancy can be a cause of security problem.  The reentrancy vulnerability of an Ethereum DAO has lead to a massive financial loss of $150M in 2016.
