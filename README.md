@@ -1,4 +1,4 @@
-# Reentrancy vulnerability of smart contracts
+# Reentrancy vulnerability of smart contracts: formal verification for secure programming
 
 The topic of this project is the reentrancy vulnerability of Solidity smart contracts.  We create a vulnerable smart contract, demonstrate how to exploit it, and apply formal verification to detect the vulnerability.  We also practice secure programming to fix the smart contract.  The safety of the improved smart contract is ensured through formal verification.
 
