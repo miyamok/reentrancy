@@ -19,7 +19,7 @@ We take a look at a running example of a vulnerable Solidity smart contract and 
 ## Vulnerable smart contract: Jar
 
 The following Solidity code implements a coin jar.
-The expected use case is that anybody can make a deposit, and anytime in the future, the depositor can withdraw money.
+The expected use case is that anybody can make a deposit, and anytime in the future, the depositor can withdraw the deposited money.
 ```
 // SPDX-License-Identifier: CC-BY-4.0
 pragma solidity >=0.8.0 <0.9.0;
@@ -273,7 +273,7 @@ deploy-jar.js
 jar-asset-balance.js
 jar-deposit-balance.js
 ```
-Those scripts are prepared to cerry out the demonstration.
+Those scripts are prepared to carry out the demonstration.
 It relies on additional information provided by the file `.env` at the project root containing
 ```
 SEPOLIA_URL=https://eth-sepolia.g.alchemy.com/v2/XXXXXXX
