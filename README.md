@@ -9,6 +9,9 @@ The rest of this document is organized as follows.  We first review what the ree
 
 The source codes for this project are available on github.
 
+This project was submitted as the final project to complete the online course "Ethereum Bootcamp" by alchemy.com.
+![Certificate](certificate.png)
+
 # Reentrancy attack
 
 The reentrancy is a programming concept where a function call causes another function call to itself before the original function call ends.
